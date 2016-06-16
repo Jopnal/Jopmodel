@@ -36,7 +36,6 @@
 #include <vector>
 
 
-//std::vector<uint8_t> vertexBuffer();
 namespace jopmodel{
 
 	class Mesh
@@ -52,192 +51,315 @@ namespace jopmodel{
 			Color = 1 << 4
 		};
 
-		Mesh(char* meshName, int type, int start, int length)
-		{
-			this->meshName = meshName;
-			this->type = type;
-			this->startLocation = start;
-			this->length = length;
-		}
-		Mesh(aiString meshName2, int type)
-		{
-			this->meshName2 = meshName2;
-			this->type = type;
-		}
-		~Mesh();
 
+		Mesh(){}
+		~Mesh(){};
 
-	private:
 		char* meshName;
-		aiString meshName2;
 		int type; //triangles, lines etc.
-
-		//bitfield here
-
+		uint32_t components = 0; //bitfield
 		int startLocation = 0;
 		int length = 0; //bytes
+	};
 
+	class Textures
+	{
+	public:
+
+
+		Textures(){}
+		~Textures(){}
+
+		std::string texturePath;
+		int type = 0; //diffuse, specular etc.
+		int wrapmode = 0; //repeat, clamp etc.
 	};
 
 	class Material
 	{
 	public:
-		Material(float position[3], float reflectionAmbient[4], float reflectionDiffuse[4], float reflectionSpecular[4], float reflectionEmissive[4], float shininess, float reflectivity)
-		{
-			this->position[3] = position[3];
-			this->reflectionAmbient[4] = reflectionAmbient[4];
-			this->reflectionDiffuse[4] = reflectionDiffuse[4];
-			this->reflectionSpecular[4] = reflectionSpecular[4];
-			this->reflectionEmissive[4] = reflectionEmissive[4];
-			this->shininess = shininess;
-			this->reflectivity = reflectivity;
-		}
-		~Material();
 
-	private:
-		float position[3];
-		float reflectionAmbient[4];
-		float reflectionDiffuse[4];
-		float reflectionSpecular[4];
-		float reflectionEmissive[4];
-		float shininess = 0;
-		float reflectivity = 0;
+
+		Material()
+		{
+		}
+		~Material(){};
+
+		char* materialName;
+		float reflections[16];// = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		float shininess = 1.0f;
+		float reflectivity = 0.0f;
+		std::vector<Textures> textures;
 	};
 
 	class Model
 	{
 	public:
-		Model();
-		Model(int wat[7]);
-		Model(std::vector<Mesh*> meshes)
-		{
-			this->meshes = meshes;
-		}
-		Model(std::vector<Material*> materials)
-		{
-			this->materials = materials;
-		}
-		Model(std::vector<Mesh*> meshes, std::vector<Material*> materials)
-		{
-			this->meshes = meshes;
-			this->materials = materials;
-		}
-		~Model();
 
-	private:
-		std::vector<Mesh*> meshes;
-		std::vector<Material*> materials;
+		Model(){};
+		~Model(){};
+
+		const char* modelName;
+		std::vector<Material> materials;
+		std::vector<Mesh> meshes;
 	};
+
 
 	size_t startPos = 0;
 	size_t sizeofjson = 0;
 	size_t sizeofjsonbin = 0;
 	size_t sizeofmeshes = 0;
 
-	const char* mainData = "{ \"name\":\"\", \"materials\":{ \"materialName\":{ \"reflections\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], \"shininess\":\"\", \"reflectivity\":\"\" }}}";
+	class jsonData
+	{
+	public:
+		jsonData()
+		{
 
-	char* modelName;
+
+		}
+
+		~jsonData()
+		{
+		}
+
+		//how to do dynamic rapidjson array
+		const char* model = "{ \"name\":\"modelName\", \"materialCount\":0, \"meshCount\":0, \"materials\":[], \"meshes\":[]  }";
+
+		const char* materialData = "{ \"materialName\":\"materialnamehere\", \"textureCount\":0,\"Material\" :{ \"reflections\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], \"shininess\":0, \"reflectivity\":0, \"textures\":[] }}";
+		const char* textureData = "{ \"texturePath\": \"\" \"Texture\":{ \"type\":0, \"wrapmode\":0  }}";
+
+		const char* meshData = "{ \"meshName\":{  \"type\":0, \"components\":0, \"start\":0, \"length\":0 }}";
+
+		//old
+		//const char* data2 = "{ \"materials\":{ \"materialName\":{ \"reflections\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], \"shininess\":0, \"reflectivity\":0, \"textures\":[] }}}";
+	};
+
+	//old
+	//const char* mainData = "{ \"name\":\"\", \"materials\":{ \"materialName\":{ \"reflections\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], \"shininess\":0, \"reflectivity\":0 }}}";
+
+	int reflectionCount = 16;
+
 	int dataStartPosition;
 	std::vector<int> mainDataVector;
 	std::vector<unsigned char*> dataPacket;
 	std::vector<size_t> dataPacketSize;
-	std::vector<float> reflections;
-	std::vector<Mesh*> meshes;
-	std::vector<aiTexture*> textures;
-	float shininess = 0.0f;
-	float reflectivity = 0.0f;
+
+	//keep this for extendability
+	std::vector<Model> models;
 }
 
+bool binaryWriter(std::string fileName, int modelsIndex);
+bool jsonWriter();
 
 
 
+//old jsonwriter
+/*
 bool jsonWriter(const char* data, rapidjson::Document &doc, const char* fileName)
 {
-	rapidjson::StringBuffer buff;
-	rapidjson::PrettyWriter<rapidjson::StringBuffer> vraitteri(buff);
-	doc.Accept(vraitteri);
+rapidjson::StringBuffer buff;
+rapidjson::PrettyWriter<rapidjson::StringBuffer> vraitteri(buff);
+doc.Accept(vraitteri);
 
-	data = buff.GetString();
+data = buff.GetString();
 
 
-	//write json to file
-	std::ofstream file(fileName);
+//write json to file
+std::ofstream file(fileName);
 
-	int siz = buff.GetSize();
-	int commas = 0;
+int siz = buff.GetSize();
+int commas = 0;
 
-	if (!file.is_open())
-	{
-		printf("Writing json failed!");
-		return false;
-	}
-
-	for (size_t i = 0; i < siz; i++)
-	{
-
-		file << data[i];
-
-	}
-	file.close();
-	return true;
+if (!file.is_open())
+{
+printf("Writing json failed!");
+return false;
 }
 
-bool jsonWriter(const char* fileName)
+for (size_t i = 0; i < siz; i++)
 {
 
+file << data[i];
 
-	rapidjson::Document doc;
-	doc.Parse(jopmodel::mainData);
-
-	//nimi
-	rapidjson::Value& v = doc["name"];
-	v = rapidjson::StringRef(jopmodel::modelName);
-
-
-	//materialName here
+}
+file.close();
+return true;
+}
+*/
 
 
-	rapidjson::Value& ref = doc["materials"]["materialName"]["reflections"];
-	for (size_t i = 0; i < 16; i++)
+
+bool jsonWriter()
+{
+	namespace rj = rapidjson;
+	std::string fileName;
+	jopmodel::jsonData jData;
+
+	rapidjson::Document modeldoc;
+	modeldoc.Parse(jData.model);
+	if (modeldoc.HasParseError())
 	{
-		ref[i] = jopmodel::reflections[i];
+		std::exit(EXIT_FAILURE);
 	}
 
+	rapidjson::Value materials(rapidjson::kArrayType);
+	
 
-	rapidjson::StringBuffer buff;
-	rapidjson::PrettyWriter<rapidjson::StringBuffer> vraitteri(buff);
-	doc.Accept(vraitteri);
+	rapidjson::Value textures(rapidjson::kArrayType);
 
-	jopmodel::mainData = buff.GetString();
-	jopmodel::sizeofjson = sizeof(jopmodel::mainData);
-	jopmodel::mainDataVector.push_back((int)jopmodel::mainData);
-
-	//write json to file
-	std::ofstream file(fileName);
-	if (file.is_open())
+ 	for (size_t i = 0; i < jopmodel::models.size(); i++) //MODELS
 	{
-		file << jopmodel::mainData;
-		file.close();
-		return true;
+		//rapidjson::Value& mnm = modeldoc["name"];
+		//mnm.SetString(rapidjson::StringRef(jopmodel::models[i].modelName));
+
+		modeldoc.AddMember(rj::StringRef("name"), rj::StringRef(jopmodel::models[i].modelName), modeldoc.GetAllocator());
+
+
+		//rapidjson::Value& mac = modeldoc["materialCount"];
+		//mac.SetInt(jopmodel::models.at(i).materials.size()); //how many materials are there 
+
+		//rapidjson::Value& moc = modeldoc["meshCount"];
+		//moc.SetInt(jopmodel::models.at(i).meshes.size()); //how many meshes are there
+
+		auto& materialArray = modeldoc.AddMember(rj::StringRef("materials"), rj::kArrayType, modeldoc.GetAllocator())["materials"];
+		for (auto& j : jopmodel::models[i].materials) //MATERIALS
+		{
+
+			materialArray.PushBack(rj::kObjectType, modeldoc.GetAllocator());
+
+			auto& materialObject = materialArray[materialArray.Size() - 1];
+
+			auto& reflectionsArray = materialObject.AddMember(rj::StringRef("reflection"), rj::kArrayType, modeldoc.GetAllocator())["reflection"];
+			for (int k = 0; k * sizeof(float) < sizeof(j.reflections); ++k)
+			{
+				reflectionsArray.PushBack(j.reflections[k], modeldoc.GetAllocator());
+			}
+
+			materialObject.AddMember(rj::StringRef("shininess"), j.shininess, modeldoc.GetAllocator())["shininess"];
+			materialObject.AddMember(rj::StringRef("reflectivity"), j.reflectivity, modeldoc.GetAllocator())["reflectivity"];
+
+
+			auto& texturesArray = materialObject.AddMember(rj::StringRef("textures"), rj::kArrayType, modeldoc.GetAllocator())["textures"];
+			for (auto& l : j.textures)
+			{
+				auto& textureObject = texturesArray.AddMember(rj::StringRef(l.texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[l.texturePath.c_str()];
+				textureObject.AddMember(rj::StringRef("type"), l.type, modeldoc.GetAllocator())["type"];
+				textureObject.AddMember(rj::StringRef("wrapmode"), l.wrapmode, modeldoc.GetAllocator())["wrapmode"];
+			}
+		}
+
+		auto& meshArray = modeldoc.AddMember(rj::StringRef("meshes"), rj::kArrayType, modeldoc.GetAllocator())["meshes"];
+		for (auto& i : jopmodel::models[i].meshes)
+		{
+			meshArray.PushBack(rj::kObjectType, modeldoc.GetAllocator());
+
+			auto& modelObject = meshArray[meshArray.Size() - 1];
+
+			modelObject.AddMember(rj::StringRef("type"), 0, modeldoc.GetAllocator())["type"];
+			modelObject.AddMember(rj::StringRef("components"), i.components, modeldoc.GetAllocator())["components"];
+			modelObject.AddMember(rj::StringRef("start"), i.startLocation, modeldoc.GetAllocator())["start"];
+			modelObject.AddMember(rj::StringRef("length"), i.length, modeldoc.GetAllocator())["length"];
+		}
+
+
+
+		fileName = (std::string)jopmodel::models.at(i).modelName + ".jop";
+		//write json to file
+		std::ofstream file(fileName);
+		if (file.is_open())
+		{
+			rapidjson::StringBuffer mdbuff;
+			rapidjson::PrettyWriter<rapidjson::StringBuffer> mdwriter(mdbuff);
+			if (modeldoc.HasParseError())
+			{
+				std::cout << "PARSE ERROR" << std::endl;
+			}
+			modeldoc.Accept(mdwriter);
+
+			jData.model = mdbuff.GetString();
+
+			file << jData.model;
+			file.close();
+			std::cout << "Wrote json from model " << i + 1 << " successfully!" << std::endl;
+			binaryWriter(fileName, i);
+		}
+
+
 	}
-	printf("Writing json failed!");
-	return false;
+	return true;
+
+
+	////nimi
+	//rapidjson::Value& v = doc["name"];
+	//v = rapidjson::StringRef(model.modelName);
+	//
+	//
+	////materialName here
+	//
+	//
+	//rapidjson::Value& ref = doc["materials"]["materialName"]["reflections"];
+	//for (size_t i = 0; i < 16; i++)
+	//{
+	//ref[i] = reflections[i];
+	//}
+	//
+	//
+	//rapidjson::StringBuffer buff;
+	//rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buff);
+	//doc.Accept(writer);
+	//puts(buff.GetString());
+	//
+	//jopmodel::mainData = buff.GetString();
+	//jopmodel::sizeofjson = sizeof(jopmodel::mainData);
+	//jopmodel::mainDataVector.push_back((int)jopmodel::mainData);
+	//
+	////write json to file
+	//std::ofstream file(fileName);
+	//if (file.is_open())
+	//{
+	//file << jopmodel::mainData;
+	//file.close();
+	//return true;
+	//}
+	//printf("Writing json failed!");
+	//return false;
+
 }
 
-bool binaryWriter(const char* fileName)
+bool binaryWriter(std::string fileName, int modelsIndex)
 {
 	std::ofstream writeFile(fileName, std::ios::out | std::ios::app | std::ios::ate);
 	if (writeFile)
 	{
 		jopmodel::startPos = writeFile.tellp(); //size of the json data == where to start writing binary data
 
-		for (size_t i = 0; i < jopmodel::mainDataVector.size(); i++)
+		for (size_t i = 0; i < jopmodel::models[modelsIndex].materials.size(); i++) //MATERIALS
 		{
-			writeFile.write((char*)&jopmodel::mainDataVector[i], sizeof(int)); //write all the data to file, needs changing to know the byte sizes of the data
+			for (size_t j = 0; j < 16; j++)
+			{
+				writeFile.write((char*)&jopmodel::models[modelsIndex].materials[i].reflections[j], sizeof(float)); //MATERIAL REFLECTIONS
+			}
+			writeFile.write((char*)&jopmodel::models[modelsIndex].materials[i].shininess, sizeof(float));
+			writeFile.write((char*)&jopmodel::models[modelsIndex].materials[i].reflectivity, sizeof(float));
+
+			for (size_t k = 0; k < jopmodel::models[modelsIndex].materials[i].textures.size(); k++) //MATERIAL TEXTURES
+			{
+				writeFile.write((char*)&jopmodel::models[modelsIndex].materials[i].textures[k].type, sizeof(float));
+				writeFile.write((char*)&jopmodel::models[modelsIndex].materials[i].textures[k].wrapmode, sizeof(float));
+			}
 		}
+
+		for (size_t i = 0; i < jopmodel::models[modelsIndex].meshes.size(); i++) //MESHES
+		{
+			writeFile.write((char*)&jopmodel::models[modelsIndex].meshes[i].type, sizeof(int));
+			writeFile.write((char*)&jopmodel::models[modelsIndex].meshes[i].components, sizeof(uint32_t));
+		}
+
 		jopmodel::sizeofjsonbin = (int)writeFile.tellp() - jopmodel::startPos;
 		writeFile.close();
 		return true;
+
 	}
 	return false;
 }
@@ -266,15 +388,19 @@ bool binaryReader(const char* fileName)
 	return true;
 }
 
-void pushReflections(aiColor3D col)
+
+
+void pushReflections(jopmodel::Material mat, aiColor3D col, int refTypeIndex)
 {
-	jopmodel::reflections.push_back(col.r);
-	jopmodel::reflections.push_back(col.g);
-	jopmodel::reflections.push_back(col.b);
-	jopmodel::reflections.push_back(1.0);
+	mat.reflections[(1 * refTypeIndex) - 1] = col.r;
+	mat.reflections[(2 * refTypeIndex) - 1] = col.g;
+	mat.reflections[(3 * refTypeIndex) - 1] = col.b;
+	mat.reflections[(4 * refTypeIndex) - 1] = 1.0;
 }
 
-bool processModel(const aiScene* scene)
+
+
+bool processModel(const aiScene* scene, jopmodel::Model model)
 {
 	if (!scene->HasMaterials())
 	{
@@ -286,35 +412,59 @@ bool processModel(const aiScene* scene)
 	}
 
 	aiMesh* mesh = scene->mMeshes[0];
-	mesh->mName;
-	mesh->mMaterialIndex;
+
+
+	model.modelName = mesh->mName.C_Str();
+	/*
+	std::string str = mesh->mName.C_Str();
+
+	char* writable = new char[str.size() + 1];
+	std::copy(str.begin(), str.end(), writable);
+	writable[str.size()] = '\0';
+
+	model.modelName = writable;
+	delete[] writable;
+	*/
+	mesh->mMaterialIndex; //do something with this
 
 
 	aiColor3D col;
 	aiMaterial* mat = scene->mMaterials[0];
 
-	mat->Get(AI_MATKEY_SHININESS, jopmodel::shininess);
-	mat->Get(AI_MATKEY_REFLECTIVITY, jopmodel::reflectivity);
-
 	for (unsigned int i = 0; i < scene->mNumMaterials; i++)
 	{
+		jopmodel::Material jopmaterial;
+
+		jopmaterial.materialName = "mnhere_pcmodel_";// +i;
+		/*
+		std::string str2 = "mnhere_pcmodel_" + i;
+		char* writable2 = new char[str2.size() + 1];
+		std::copy(str2.begin(), str2.end(), writable2);
+		writable2[str2.size()] = '\0';
+		jopmaterial.materialName = writable2;
+		delete[] writable2;
+		*/
 		mat = scene->mMaterials[i];
 
 		mat->Get(AI_MATKEY_COLOR_AMBIENT, col);
-		pushReflections(col);
+		pushReflections(jopmaterial, col, 1);
 		mat->Get(AI_MATKEY_COLOR_DIFFUSE, col);
-		pushReflections(col);
+		pushReflections(jopmaterial, col, 2);
 		mat->Get(AI_MATKEY_COLOR_SPECULAR, col);
-		pushReflections(col);
+		pushReflections(jopmaterial, col, 3);
 		mat->Get(AI_MATKEY_COLOR_EMISSIVE, col);
-		pushReflections(col);
-
+		pushReflections(jopmaterial, col, 4);
+		mat->Get(AI_MATKEY_SHININESS, jopmaterial.shininess);
+		mat->Get(AI_MATKEY_REFLECTIVITY, jopmaterial.reflectivity);
+	
 		//iterate from diffuse to unknown
 		//if there is a texture of that type do something with it
 		for (int i = aiTextureType::aiTextureType_DIFFUSE; i < aiTextureType::aiTextureType_UNKNOWN; i++)
 		{
 			if (mat->GetTextureCount((aiTextureType)i))
 			{
+				jopmodel::Textures joptexture;
+
 				aiTexture tex;
 				aiString path;
 
@@ -322,10 +472,16 @@ bool processModel(const aiScene* scene)
 
 				if (path.length)
 				{
+					
+
+					joptexture.texturePath = path.C_Str();
 					printf("found texture\n");
 				}
+				jopmaterial.textures.push_back(joptexture);
 			}
 		}
+
+		model.materials.push_back(jopmaterial);
 	}
 
 
@@ -334,6 +490,8 @@ bool processModel(const aiScene* scene)
 	int type = 0;
 	for (size_t i = 0; i < scene->mNumMeshes; i++)
 	{
+		jopmodel::Mesh jopmesh;
+
 		const uint32_t comps = jopmodel::Mesh::Position
 
 			| (mesh->HasTextureCoords(0)         * jopmodel::Mesh::TexCoords)
@@ -342,14 +500,15 @@ bool processModel(const aiScene* scene)
 			| (mesh->HasVertexColors(0)          * jopmodel::Mesh::Color)
 			;
 
+		jopmesh.components = comps;
 
 
 		//jopmodel::meshes.push_back(std::make_pair(&ResourceManager::getNamedResource<Mesh>("jop_mesh_" + getHex(), vertBuf.data(), vertBuf.size(), comps, indBuf.data(), elemSize, mesh->mNumFaces * 3), mesh->mMaterialIndex));
 
 
-
-		jopmodel::meshes.push_back(new jopmodel::Mesh(scene->mMeshes[i]->mName, type));
+		model.meshes.push_back(jopmesh);
 	}
+	jopmodel::models.push_back(model);
 	return true;
 }
 
@@ -357,14 +516,9 @@ int main(int argc, char* argv[])
 {
 	std::string str(argv[0]); //polku .exeen
 
-
-	std::vector<jopmodel::Mesh*> globmeshes;
-	std::vector<jopmodel::Material*> globmaterials;
-
 	//**********************************************************************************************
 	//**********************************************************************************************
 	//**********************************************************************************************
-
 
 
 	//**********************************************************************************************
@@ -378,7 +532,6 @@ int main(int argc, char* argv[])
 	//muuttujat
 	//char* pt1 = "DOOMGUY";
 
-	char* fileName = "data.jop";
 
 	//int wat[] = { 3, 5, 7 };
 	//float reflections[] = { 1.0, 0.5, 0.2, 1.0, 0.0, 0.0, 0.0, 1.0 };
@@ -414,7 +567,7 @@ int main(int argc, char* argv[])
 	char* modelFile = ""; //path to model file
 
 	printf("Loading model...\n");
-	const aiScene *scene = imp.ReadFile(modelFile, NULL);// aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+	const aiScene *scene = imp.ReadFile(modelFile, aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_OptimizeGraph);
 	if (!scene) {
 		printf("Unable to load mesh: %s\n", imp.GetErrorString());
 	}
@@ -422,6 +575,8 @@ int main(int argc, char* argv[])
 	{
 		printf("Successfully loaded file!\n");
 	}
+
+	jopmodel::Model jopmodelbase;
 
 	////get modelname
 	//int count = 0;
@@ -449,17 +604,16 @@ int main(int argc, char* argv[])
 	//}
 	////end get modelname
 
-	jopmodel::modelName = "wqertyuiop"; //temp while getting that to work ^
+	jopmodelbase.modelName = "wqertyuiop"; //temp while getting that to work ^
 
-	if (!processModel(scene))
+	if (!processModel(scene, jopmodelbase))
 	{
 		printf("Handling model failed! (inside processModel())\n");
 	}
 
 	//write data to file
-	jsonWriter(fileName);
-	binaryWriter(fileName);
-	binaryReader(fileName);
+	jsonWriter();
+
 
 	//**********************************************************************************************
 	//**********************************************************************************************
@@ -494,3 +648,151 @@ int main(int argc, char* argv[])
 	return 1;
 
 }
+
+/*
+
+int main(int, char*[]) {
+////////////////////////////////////////////////////////////////////////////
+// 1. Parse a JSON text string to a document.
+
+const char json[] = " { \"hello\" : \"world\", \"t\" : true , \"f\" : false, \"n\": null, \"i\":123, \"pi\": 3.1416, \"a\":[1, 2, 3, 4] } ";
+printf("Original JSON:\n %s\n", json);
+
+Document document;  // Default template parameter uses UTF8 and MemoryPoolAllocator.
+
+#if 0
+// "normal" parsing, decode strings to new buffers. Can use other input stream via ParseStream().
+if (document.Parse(json).HasParseError())
+return 1;
+#else
+// In-situ parsing, decode strings directly in the source string. Source must be string.
+char buffer[sizeof(json)];
+memcpy(buffer, json, sizeof(json));
+if (document.ParseInsitu(buffer).HasParseError())
+return 1;
+#endif
+
+printf("\nParsing to document succeeded.\n");
+
+////////////////////////////////////////////////////////////////////////////
+// 2. Access values in document.
+
+printf("\nAccess values in document:\n");
+assert(document.IsObject());    // Document is a JSON value represents the root of DOM. Root can be either an object or array.
+
+assert(document.HasMember("hello"));
+assert(document["hello"].IsString());
+printf("hello = %s\n", document["hello"].GetString());
+
+// Since version 0.2, you can use single lookup to check the existing of member and its value:
+Value::MemberIterator hello = document.FindMember("hello");
+assert(hello != document.MemberEnd());
+assert(hello->value.IsString());
+assert(strcmp("world", hello->value.GetString()) == 0);
+(void)hello;
+
+assert(document["t"].IsBool());     // JSON true/false are bool. Can also uses more specific function IsTrue().
+printf("t = %s\n", document["t"].GetBool() ? "true" : "false");
+
+assert(document["f"].IsBool());
+printf("f = %s\n", document["f"].GetBool() ? "true" : "false");
+
+printf("n = %s\n", document["n"].IsNull() ? "null" : "?");
+
+assert(document["i"].IsNumber());   // Number is a JSON type, but C++ needs more specific type.
+assert(document["i"].IsInt());      // In this case, IsUint()/IsInt64()/IsUInt64() also return true.
+printf("i = %d\n", document["i"].GetInt()); // Alternative (int)document["i"]
+
+assert(document["pi"].IsNumber());
+assert(document["pi"].IsDouble());
+printf("pi = %g\n", document["pi"].GetDouble());
+
+{
+const Value& a = document["a"]; // Using a reference for consecutive access is handy and faster.
+assert(a.IsArray());
+for (SizeType i = 0; i < a.Size(); i++) // rapidjson uses SizeType instead of size_t.
+printf("a[%d] = %d\n", i, a[i].GetInt());
+
+int y = a[0].GetInt();
+(void)y;
+
+// Iterating array with iterators
+printf("a = ");
+for (Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+printf("%d ", itr->GetInt());
+printf("\n");
+}
+
+// Iterating object members
+static const char* kTypeNames[] = { "Null", "False", "True", "Object", "Array", "String", "Number" };
+for (Value::ConstMemberIterator itr = document.MemberBegin(); itr != document.MemberEnd(); ++itr)
+printf("Type of member %s is %s\n", itr->name.GetString(), kTypeNames[itr->value.GetType()]);
+
+////////////////////////////////////////////////////////////////////////////
+// 3. Modify values in document.
+
+// Change i to a bigger number
+{
+uint64_t f20 = 1;   // compute factorial of 20
+for (uint64_t j = 1; j <= 20; j++)
+f20 *= j;
+document["i"] = f20;    // Alternate form: document["i"].SetUint64(f20)
+assert(!document["i"].IsInt()); // No longer can be cast as int or uint.
+}
+
+// Adding values to array.
+{
+Value& a = document["a"];   // This time we uses non-const reference.
+Document::AllocatorType& allocator = document.GetAllocator();
+for (int i = 5; i <= 10; i++)
+a.PushBack(i, allocator);   // May look a bit strange, allocator is needed for potentially realloc. We normally uses the document's.
+
+// Fluent API
+a.PushBack("Lua", allocator).PushBack("Mio", allocator);
+}
+
+// Making string values.
+
+// This version of SetString() just store the pointer to the string.
+// So it is for literal and string that exists within value's life-cycle.
+{
+document["hello"] = "rapidjson";    // This will invoke strlen()
+// Faster version:
+// document["hello"].SetString("rapidjson", 9);
+}
+
+// This version of SetString() needs an allocator, which means it will allocate a new buffer and copy the the string into the buffer.
+Value author;
+{
+//char buffer2[10];
+//int len = sprintf(buffer2, "%s %s", "Milo", "Yip");  // synthetic example of dynamically created string.
+
+//author.SetString(buffer2, static_cast<SizeType>(len), document.GetAllocator());
+// Shorter but slower version:
+// document["hello"].SetString(buffer, document.GetAllocator());
+
+// Constructor version:
+// Value author(buffer, len, document.GetAllocator());
+// Value author(buffer, document.GetAllocator());
+//memset(buffer2, 0, sizeof(buffer2)); // For demonstration purpose.
+}
+// Variable 'buffer' is unusable now but 'author' has already made a copy.
+document.AddMember("author", author, document.GetAllocator());
+
+assert(author.IsNull());        // Move semantic for assignment. After this variable is assigned as a member, the variable becomes null.
+
+////////////////////////////////////////////////////////////////////////////
+// 4. Stringify JSON
+
+printf("\nModified JSON with reformatting:\n");
+StringBuffer sb;
+PrettyWriter<StringBuffer> writer(sb);
+document.Accept(writer);    // Accept() traverses the DOM and generates Handler events.
+puts(sb.GetString());
+
+_getch();
+
+return 0;
+}
+
+*/

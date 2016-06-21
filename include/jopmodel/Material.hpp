@@ -1,4 +1,4 @@
-﻿// Jopnal Model C++ Application
+// Jopnal Model C++ Application
 // Copyright(c) 2016 Team Jopnal
 // 
 // This software is provided 'as-is', without any express or implied
@@ -17,12 +17,33 @@
 // misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 
+//////////////////////////////////////////////
 
+#ifndef JOPM_MATERIAL_HPP
+#define JOPM_MATERIAL_HPP
 
-#include "Converter.hpp"
+//Headers
+#include <jopmodel/Texture.hpp>
+#include <cstdint>
+#include <vector>
 
+//////////////////////////////////////////////
 
-int main(int argc, char* argv[])
+namespace jopm
 {
-	return jop::Converter::conversion(argc, argv);
+	class Material
+	{
+	public:
+		Material();
+		~Material();
+	private:
+
+		friend class Converter;
+
+		float m_reflections[16];
+		float m_shininess = 1.0f;
+		float m_reflectivity = 0.0f;
+		std::vector<Texture> m_textures;
+	};
 }
+#endif

@@ -17,26 +17,31 @@
 // misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 
-#ifndef JOP_MODEL_HPP
-#define JOP_MODEL_HPP
+//////////////////////////////////////////////
 
-#include "Material.hpp"
-#include "Mesh.hpp"
-#include <vector>
+#ifndef JOPM_TEXTURE_HPP
+#define JOPM_TEXTURE_HPP
 
+//Headers
+#include <string>
 
-namespace jop
+//////////////////////////////////////////////
+
+namespace jopm
 {
-	class Model
+	class Texture
 	{
-		friend class Converter;
 	public:
-		Model();
-		~Model();
+		Texture();
+		~Texture();
 
 	private:
-		std::vector<Material> m_materials;
-		std::vector<Mesh> m_meshes;
+
+		friend class Converter;
+
+		std::string m_texturePath;
+		int m_type = 0; //diffuse, specular etc.
+		int m_wrapmode = 0; //repeat, clamp etc.
 	};
 }
 #endif

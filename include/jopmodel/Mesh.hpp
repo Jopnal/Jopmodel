@@ -17,46 +17,42 @@
 // misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 
+//////////////////////////////////////////////
 
-#ifndef JOP_MATERIAL_HPP
-#define JOP_MATERIAL_HPP
+#ifndef JOPM_MESH_HPP
+#define JOPM_MESH_HPP
 
+//Headers
 #include <cstdint>
 #include <vector>
-#include "Texture.hpp"
 
-namespace jop
+//////////////////////////////////////////////
+
+namespace jopm
 {
-	class Material
+	class Mesh
 	{
 	public:
-		Material();
-		~Material();
+
+		Mesh();
+		~Mesh();
+
 	private:
 
 		friend class Converter;
 
-		typedef uint32_t AttribType;
-		enum Map
-		{
-			Diffuse = 1,
-			Specular,
-			Emission,
-			Environment,
-			Reflection,
-			//Normal
-			//Parallax
-			Opacity,
-			Gloss,
+		std::vector<unsigned char> m_vertexBuffer;
+		std::vector<unsigned char> m_indexBuffer;
+		uint32_t m_vertexComponents;
 
-			/// For internal use. Never use this
-			Last
-		};
+		uint32_t m_matIndex;
+		int m_type; //triangles, lines etc.
+		uint32_t m_components = 0; //bitfield
 
-		float m_reflections[16];
-		float m_shininess = 1.0f;
-		float m_reflectivity = 0.0f;
-		std::vector<Texture> m_textures;
+		unsigned int m_startIndex = 0;
+		unsigned int m_start = 0;
+		unsigned int m_lengthIndex = 0;
+		unsigned int m_length = 0; //bytes
 	};
 }
 #endif

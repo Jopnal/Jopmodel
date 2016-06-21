@@ -17,45 +17,30 @@
 // misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 
+//////////////////////////////////////////////
 
-#ifndef JOP_MESH_HPP
-#define JOP_MESH_HPP
+#ifndef JOPM_MODEL_HPP
+#define JOPM_MODEL_HPP
 
-#include <cstdint>
+//Headers
+#include <jopmodel/Material.hpp>
+#include <jopmodel/Mesh.hpp>
 #include <vector>
 
-namespace jop
-{
-	class Mesh
-	{
-	public:
-		enum VertexComponent : uint32_t
-		{
-			Position = 1,
-			TexCoords = 1 << 1,
-			Normal = 1 << 2,
-			Tangents = 1 << 3,
-			Color = 1 << 4
-		};
+//////////////////////////////////////////////
 
-		Mesh();
-		~Mesh();
+namespace jopm
+{
+	class Model
+	{
+		friend class Converter;
+	public:
+		Model();
+		~Model();
 
 	private:
-
-		friend class Converter;
-
-		std::vector<unsigned char> m_vertexBuffer;
-		std::vector<unsigned char> m_indexBuffer;
-		uint32_t m_vertexComponents;
-
-		int m_type; //triangles, lines etc.
-		uint32_t m_components = 0; //bitfield
-
-		unsigned int m_startIndex = 0;
-		unsigned int m_start = 0;
-		unsigned int m_lengthIndex = 0;
-		unsigned int m_length = 0; //bytes
+		std::vector<Material> m_materials;
+		std::vector<Mesh> m_meshes;
 	};
 }
 #endif

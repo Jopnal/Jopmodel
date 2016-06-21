@@ -1,17 +1,43 @@
-#include "Converter.hpp"
+// Jopnal Model C++ Application
+// Copyright(c) 2016 Team Jopnal
+// 
+// This software is provided 'as-is', without any express or implied
+// warranty.In no event will the authors be held liable for any damages
+// arising from the use of this software.
+// 
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions :
+// 
+// 1. The origin of this software must not be misrepresented; you must not
+// claim that you wrote the original software.If you use this software
+// in a product, an acknowledgement in the product documentation would be
+// appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+// misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-namespace jop
+//////////////////////////////////////////////
+
+//Headers
+#include <jopmodel/Converter.hpp>
+#include <Jopnal/Graphics/Material.hpp>
+#include <Jopnal/Graphics/Mesh.hpp>
+#include <Jopnal/Graphics/Texture.hpp>
+
+//////////////////////////////////////////////
+
+namespace jopm
 {
 	Converter::Converter()
 	{
 	}
 
-
 	Converter::~Converter()
 	{
 	}
 
-	bool Converter::binaryWriter(jop::Model& model, std::string fileOut)
+	bool Converter::binaryWriter(Model& model, const std::string fileOut)
 	{
 		std::ofstream writeFile(fileOut, std::ios::out | std::ios::app | std::ios::ate);
 		if (writeFile)
@@ -28,11 +54,11 @@ namespace jop
 		return false;
 	}
 
-	bool Converter::jsonWriter(jop::Model& model, std::string fileOut)
+	bool Converter::jsonWriter(Model& model, const std::string fileOut)
 	{
 		namespace rj = rapidjson;
 
-		rapidjson::Document modeldoc;
+		rj::Document modeldoc;
 		modeldoc.SetObject();
 
 		auto& materialArray = modeldoc.AddMember(rj::StringRef("materials"), rj::kArrayType, modeldoc.GetAllocator())["materials"];
@@ -67,6 +93,7 @@ namespace jop
 
 			auto& modelObject = meshArray[meshArray.Size() - 1];
 
+			modelObject.AddMember(rj::StringRef("material"), i.m_matIndex, modeldoc.GetAllocator())["material"];
 			modelObject.AddMember(rj::StringRef("type"), i.m_type, modeldoc.GetAllocator())["type"];
 			modelObject.AddMember(rj::StringRef("components"), i.m_components, modeldoc.GetAllocator())["components"];
 			modelObject.AddMember(rj::StringRef("start"), i.m_start, modeldoc.GetAllocator())["start"];
@@ -91,39 +118,7 @@ namespace jop
 		return false;
 	}
 
-	/*
-	bool Converter::binaryReader(std::string fileOut)
-	{
-	std::ifstream readFile(fileOut, std::ios::binary | std::ios::in);
-	if (readFile)
-	{
-	while (!EOF)
-	{
-	//	if (char )
-	}
-	readFile.seekg(jop::m_startPos); //find the last } in the file
-
-
-	std::cout << "startpos: " << jop::m_startPos << ", size of jsonbin: " << jopmodel::m_sizeofjsonbin << std::endl;
-	int n;
-	int count = 0;
-	for (size_t i = 0; i < jop::sizeofjsonbin; i++)
-	{
-	readFile.read((char*)&n, sizeof(int));	//read
-	std::cout << n;							//print
-	count++;
-	if (count % 25 == 0)
-	{
-	std::cout << std::endl;
-	}
-	}
-	readFile.close();
-	}
-	return true;
-	}
-	*/
-
-	void Converter::pushReflections(jop::Material &jopmat, aiColor3D col, int refTypeIndex)
+	void Converter::pushReflections(Material &jopmat, const aiColor3D col, const int refTypeIndex)
 	{
 		jopmat.m_reflections[refTypeIndex * 4 + 0] = col.r;
 		jopmat.m_reflections[refTypeIndex * 4 + 1] = col.g;
@@ -131,14 +126,14 @@ namespace jop
 		jopmat.m_reflections[refTypeIndex * 4 + 3] = 1.0;
 	}
 
-	void Converter::getMaterials(const aiScene* scene, jop::Model& model)
+	void Converter::getMaterials(const aiScene* scene, Model& model)
 	{
 		aiColor3D col;
 
 		printf("Materials: %d\nMeshes: %d\n", scene->mNumMaterials, scene->mNumMeshes);
 		for (size_t j = 0; j < scene->mNumMaterials; j++)
 		{
-			jop::Material jopmaterial;
+			Material jopmaterial;
 
 			aiMaterial aiMat = *scene->mMaterials[j];
 
@@ -163,7 +158,7 @@ namespace jop
 				jopmaterial.m_reflectivity = rf;
 			}
 
-			jop::Texture joptexture;
+			Texture joptexture;
 
 			auto getFlags = [&aiMat, &joptexture](const aiTextureType aiType, const int ind, aiTextureFlags flags)
 			{
@@ -178,22 +173,23 @@ namespace jop
 					break;
 				}
 
+				
 				//Wrapmode
 				aiTextureMapMode mapMode;
 				aiMat.Get(AI_MATKEY_MAPPING(aiType, ind), mapMode);
 				switch (mapMode)
 				{
 				case aiTextureMapMode_Wrap:
-					joptexture.m_wrapmode = jop::Texture::Repeat::Basic;
+					joptexture.m_wrapmode = static_cast<int>(jop::TextureSampler::Repeat::Basic);
 					break;
 				case aiTextureMapMode_Clamp:
-					joptexture.m_wrapmode = jop::Texture::Repeat::ClampEdge;
+					joptexture.m_wrapmode = static_cast<int>(jop::TextureSampler::Repeat::ClampEdge);
 					break;
 				case aiTextureMapMode_Decal:
-					joptexture.m_wrapmode = jop::Texture::Repeat::ClampBorder;
+					joptexture.m_wrapmode = static_cast<int>(jop::TextureSampler::Repeat::ClampBorder);
 					break;
 				case aiTextureMapMode_Mirror:
-					joptexture.m_wrapmode = jop::Texture::Repeat::Mirrored;
+					joptexture.m_wrapmode = static_cast<int>(jop::TextureSampler::Repeat::Mirrored);
 				}
 			};
 
@@ -209,7 +205,7 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Diffuse;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
@@ -223,7 +219,7 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Specular;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
@@ -237,7 +233,7 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Gloss;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
@@ -251,7 +247,7 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Emission;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
@@ -265,7 +261,7 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Reflection;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
@@ -279,22 +275,68 @@ namespace jop
 					if (path.length)
 					{
 						joptexture.m_texturePath = path.C_Str();
-						joptexture.m_type = jop::Material::Map::Opacity;
+						joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
 						jopmaterial.m_textures.push_back(joptexture);
 					}
 				}
+
+				if (aiMat.GetTextureCount(aiTextureType_UNKNOWN))
+				{
+					for (std::size_t i = 0; i < aiMat.GetTextureCount(aiTextureType_UNKNOWN); ++i)
+					{
+						aiString path;
+						aiMat.GetTexture(aiTextureType_UNKNOWN, i, &path);
+
+						using A = jop::Material::Attribute;
+						using M = jop::Material::Map;
+						M map;
+
+						// Diffuse
+						if (strstr(path.C_Str(), "dif"))
+							map = M::Diffuse;
+
+						// Specular
+						else if (strstr(path.C_Str(), "spec"))
+							map = M::Specular;
+
+						// Emission
+						else if (strstr(path.C_Str(), "emis"))
+							map = M::Emission;
+
+						// Reflection
+						else if (strstr(path.C_Str(), "refl"))
+							map = M::Reflection;
+
+						// Opacity
+						else if (strstr(path.C_Str(), "opa") || strstr(path.C_Str(), "alp"))
+							map = M::Opacity;
+
+						// Gloss
+						else if (strstr(path.C_Str(), "glo"))
+							map = M::Gloss;
+
+						// Not identified
+						else
+							continue;
+
+						joptexture.m_texturePath = path.C_Str();
+						joptexture.m_type = static_cast<int>(map);
+						jopmaterial.m_textures.push_back(joptexture);
+					}
+				}
+
 			}
 			model.m_materials.push_back(jopmaterial);
 		}
 	}
 
-	void Converter::getMeshes(const aiScene* scene, jop::Model& model)
+	void Converter::getMeshes(const aiScene* scene, Model& model)
 	{
 		unsigned int totalSize = 0;
 
 		for (size_t j = 0; j < scene->mNumMeshes; ++j)
 		{
-			jop::Mesh jopmesh;
+			Mesh jopmesh;
 			jopmesh.m_start = totalSize;
 			aiMesh* mesh = scene->mMeshes[j];
 			if (!mesh->mVertices)
@@ -305,11 +347,11 @@ namespace jop
 			//VERTICES
 			jopmesh.m_vertexBuffer.resize
 				(
-				(sizeof(aiVector3D) +
-				sizeof(aiVector2D) * mesh->HasTextureCoords(0) +
-				sizeof(aiVector3D) * mesh->HasNormals() +
-				sizeof(aiVector3D) * mesh->HasTangentsAndBitangents() * 2 +
-				sizeof(aiColor4D)     * mesh->HasVertexColors(0)
+				(sizeof(glm::vec3) +
+				sizeof(glm::vec2) * mesh->HasTextureCoords(0) +
+				sizeof(glm::vec3) * mesh->HasNormals() +
+				sizeof(glm::vec3) * mesh->HasTangentsAndBitangents() * 2 +
+				sizeof(jop::Color)     * mesh->HasVertexColors(0)
 				)
 				* mesh->mNumVertices
 				);
@@ -318,52 +360,63 @@ namespace jop
 
 			for (size_t k = 0, vertIndex = 0; k < mesh->mNumVertices; ++k)
 			{
+				//Material index
+				jopmesh.m_matIndex = mesh->mMaterialIndex;
+
 				// Position
 				{
 					auto& pos = mesh->mVertices[k];
-					reinterpret_cast<aiVector3D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiVector3D(pos.x, pos.y, pos.z);
-					vertIndex += sizeof(aiVector3D);
-					meshSize += sizeof(aiVector3D);
+					reinterpret_cast<glm::vec3&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec3(pos.x, pos.y, pos.z);
+					vertIndex += sizeof(glm::vec3);
+					meshSize += sizeof(glm::vec3);
 				}
 
 				// Tex coordinates
 				if (mesh->HasTextureCoords(0))
 				{
 					auto& tc = mesh->mTextureCoords[0][k];
-					reinterpret_cast<aiVector2D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiVector2D(tc.x, tc.y);
-					vertIndex += sizeof(aiVector2D);
-					meshSize += sizeof(aiVector2D);
+					reinterpret_cast<glm::vec2&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec2(tc.x, tc.y);
+					vertIndex += sizeof(glm::vec2);
+					meshSize += sizeof(glm::vec2);
 				}
 
 				// Normal
 				if (mesh->HasNormals())
 				{
 					auto& norm = mesh->mNormals[k];
-					reinterpret_cast<aiVector3D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiVector3D(norm.x, norm.y, norm.z);
-					vertIndex += sizeof(aiVector3D);
-					meshSize += sizeof(aiVector3D);
+					reinterpret_cast<glm::vec3&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec3(norm.x, norm.y, norm.z);
+					vertIndex += sizeof(glm::vec3);
+					meshSize += sizeof(glm::vec3);
 				}
 
 				// Tangents
 				if (mesh->HasTangentsAndBitangents())
 				{
 					auto& tang = mesh->mTangents[k], bitang = mesh->mBitangents[k];
-					reinterpret_cast<aiVector3D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiVector3D(tang.x, tang.y, tang.z);
-					vertIndex += sizeof(aiVector3D);
-					meshSize += sizeof(aiVector3D);
+					reinterpret_cast<glm::vec3&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec3(tang.x, tang.y, tang.z);
+					vertIndex += sizeof(glm::vec3);
+					meshSize += sizeof(glm::vec3);
 
-					reinterpret_cast<aiVector3D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiVector3D(bitang.x, bitang.y, bitang.z);
-					vertIndex += sizeof(aiVector3D);
-					meshSize += sizeof(aiVector3D);
+					reinterpret_cast<glm::vec3&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec3(bitang.x, bitang.y, bitang.z);
+					vertIndex += sizeof(glm::vec3);
+					meshSize += sizeof(glm::vec3);
 				}
 
-				// Color
+				struct Color
+				{
+					float r, g, b, a;
+
+
+
+				};
+
+				// 
 				if (mesh->HasVertexColors(0))
 				{
 					auto& col = mesh->mColors[0][k];
-					reinterpret_cast<aiColor4D&>(jopmesh.m_vertexBuffer[vertIndex]) = aiColor4D(col.r, col.g, col.b, col.a);
-					vertIndex += sizeof(aiColor4D);
-					meshSize += sizeof(aiColor4D);
+					reinterpret_cast<Color&>(jopmesh.m_vertexBuffer[vertIndex]) = Color{ col.r, col.g, col.b, col.a };
+					vertIndex += sizeof(Color);
+					meshSize += sizeof(Color);
 				}
 			}
 			jopmesh.m_length = meshSize;
@@ -407,23 +460,40 @@ namespace jop
 				jopmesh.m_lengthIndex = indexSize;
 			}
 			//COMPONENTS
-			jopmesh.m_components = jopmesh.Position
-				| (mesh->HasTextureCoords(0)         * jopmesh.TexCoords)
-				| (mesh->HasNormals()                * jopmesh.Normal)
-				| (mesh->HasTangentsAndBitangents()  * jopmesh.Tangents)
-				| (mesh->HasVertexColors(0)          * jopmesh.Color)
+			jopmesh.m_components = jop::Mesh::VertexComponent::Position
+				| (mesh->HasTextureCoords(0)         * jop::Mesh::VertexComponent::TexCoords)
+				| (mesh->HasNormals()                * jop::Mesh::VertexComponent::Normal)
+				| (mesh->HasTangentsAndBitangents()  * jop::Mesh::VertexComponent::Tangents)
+				| (mesh->HasVertexColors(0)          * jop::Mesh::VertexComponent::Color)
 				;
 
 			model.m_meshes.push_back(jopmesh);
 		}
 	}
 
-	int Converter::conversion(int argc, char* argv[])
+	int Converter::conversion(const int argc, char* argv[])
 	{
 		if (argc > 1)
 		{
 			std::string pathIn = argv[1];
-			jop::Converter conv;
+			Converter conv;
+			std::string fileOut;
+
+			if (argv[1] == "-h" || argv[1] == "/h" || argv[1] == "-help" || argv[1] == "/help")
+			{
+				printf("konv:\n First argument: file to load\n(Optional) Second argument: filename to write out");
+				return 0;
+			}
+
+			if (argc > 2)
+			{
+				fileOut = argv[2];
+				fileOut += ".jop";
+			}
+			else
+			{
+				fileOut = "model.jop";
+			}
 
 			//read old model file with assimp
 			Assimp::Importer imp;
@@ -435,8 +505,8 @@ namespace jop
 			}
 			printf("Successfully loaded file\n");
 
-			jop::Model model;
-			std::string fileOut = "model.jop";
+			Model model;
+			
 
 			conv.getMaterials(scene, model);
 			conv.getMeshes(scene, model);

@@ -53,6 +53,7 @@ namespace jopm
 		unsigned int m_start = 0;
 		unsigned int m_lengthIndex = 0;
 		unsigned int m_length = 0; //bytes
-	};
+        unsigned int m_sizeIndex = 0;
+    };
 }
 #endif

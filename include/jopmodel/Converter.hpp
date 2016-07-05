@@ -23,6 +23,7 @@
 #define	JOPM_CONVERTER_HPP
 
 //Headers
+
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -50,6 +51,9 @@ namespace jopm
 		Converter();
 		~Converter();
 
+        bool makeNodes(const aiNode& parentNode, const std::vector<const Mesh>& meshes, const std::vector<const Material>& mats, rapidjson::Document& modeldoc);
+
+        bool processNode(const aiNode& node, const std::vector<const Mesh>& meshes, const std::vector<const Material>& mats, rapidjson::Document& modeldoc);
 
 		bool binaryWriter(Model& model, const std::string fileOut);
 

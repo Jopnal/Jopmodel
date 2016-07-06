@@ -23,6 +23,7 @@
 
 #include <jopmodel/Converter.hpp>
 
+
 #include <Jopnal/Graphics/Material.hpp>
 #include <Jopnal/Graphics/Mesh.hpp>
 #include <Jopnal/Graphics/Texture.hpp>
@@ -56,64 +57,71 @@ namespace jopm
         return false;
     }
 
-    bool Converter::processNode(aiNode& node, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Document& modeldoc, rapidjson::Value& rootChild)
+    bool Converter::processNode(aiNode& node, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& rootChild, rapidjson::Value*& out)
     {
         namespace rj = rapidjson;
 
         if (!node.mName.length)
             node.mName = "unnamed";
 
-        rootChild.AddMember(rj::StringRef(node.mName.C_Str()), rj::kObjectType, modeldoc.GetAllocator());
+        rootChild.AddMember(rj::StringRef(node.mName.C_Str()), rj::kObjectType, alloc);
         auto& nodeObject = (rootChild.MemberEnd() - 1)->value;
 
+        out = &nodeObject;
 
-        
         // Transform
         {
             aiVector3D scale, pos; aiQuaternion rot;
             node.mTransformation.Decompose(scale, rot, pos);
             glm::quat rots(rot.w, rot.x, rot.y, rot.z);
 
-            auto& scaleArray = nodeObject.AddMember(rj::StringRef("scale"), rj::kArrayType, modeldoc.GetAllocator())["scale"];
-            scaleArray.PushBack(scale.x, modeldoc.GetAllocator());
-            scaleArray.PushBack(scale.y, modeldoc.GetAllocator());
-            scaleArray.PushBack(scale.z, modeldoc.GetAllocator());
+            auto& scaleArray = nodeObject.AddMember(rj::StringRef("scale"), rj::kArrayType, alloc)["scale"];
+            scaleArray.PushBack(scale.x, alloc);
+            scaleArray.PushBack(scale.y, alloc);
+            scaleArray.PushBack(scale.z, alloc);
 
-            auto& rotationArray = nodeObject.AddMember(rj::StringRef("rotation"), rj::kArrayType, modeldoc.GetAllocator())["rotation"];
-            rotationArray.PushBack(rots.w, modeldoc.GetAllocator());
-            rotationArray.PushBack(rots.x, modeldoc.GetAllocator());
-            rotationArray.PushBack(rots.y, modeldoc.GetAllocator());
-            rotationArray.PushBack(rots.z, modeldoc.GetAllocator());
+            auto& rotationArray = nodeObject.AddMember(rj::StringRef("rotation"), rj::kArrayType, alloc)["rotation"];
+            rotationArray.PushBack(rots.w, alloc);
+            rotationArray.PushBack(rots.x, alloc);
+            rotationArray.PushBack(rots.y, alloc);
+            rotationArray.PushBack(rots.z, alloc);
 
-            auto& positionArray = nodeObject.AddMember(rj::StringRef("position"), rj::kArrayType, modeldoc.GetAllocator())["position"];
-            positionArray.PushBack(scale.x, modeldoc.GetAllocator());
-            positionArray.PushBack(scale.y, modeldoc.GetAllocator());
-            positionArray.PushBack(scale.z, modeldoc.GetAllocator());
+            auto& positionArray = nodeObject.AddMember(rj::StringRef("position"), rj::kArrayType, alloc)["position"];
+            positionArray.PushBack(scale.x, alloc);
+            positionArray.PushBack(scale.y, alloc);
+            positionArray.PushBack(scale.z, alloc);
         }
 
         //mesh index
-        auto& meshArray = nodeObject.AddMember(rj::StringRef("meshes"), rj::kArrayType, modeldoc.GetAllocator())["meshes"];
-        
-        for (int i = 0; i < node.mNumMeshes; ++i)
+        auto& meshArray = nodeObject.AddMember(rj::StringRef("meshes"), rj::kArrayType, alloc)["meshes"];
+
+        for (size_t i = 0; i < node.mNumMeshes; ++i)
         {
-            meshArray.PushBack(node.mMeshes[i], modeldoc.GetAllocator());
+            meshArray.PushBack(node.mMeshes[i], alloc);
         }
 
         return true;
     }
 
-    bool Converter::makeNodes(aiNode& parentNode, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Document& modeldoc, rapidjson::Value& root)
+    bool Converter::makeNodes(aiNode& parentNode, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root)
     {
-        if (!processNode(parentNode, meshes, mats, modeldoc, root))
+        rapidjson::Value* out = nullptr;
+
+        if (!processNode(parentNode, meshes, mats, alloc, root, out))
             return false;
+
+        rapidjson::Value* rootChild = nullptr;
+
+        if (parentNode.mNumChildren)
+            rootChild = &out->AddMember(rapidjson::StringRef("children"), rapidjson::kObjectType, alloc)["children"];
 
         for (std::size_t i = 0; i < parentNode.mNumChildren; ++i)
         {
             aiNode& thisNode = *parentNode.mChildren[i];
 
-            auto& rootChild = root.AddMember(rapidjson::StringRef("children"), rapidjson::kObjectType, modeldoc.GetAllocator())["children"];
 
-            if (!makeNodes(thisNode, meshes, mats, modeldoc, rootChild))
+
+            if (!makeNodes(thisNode, meshes, mats, alloc, *rootChild))
                 return false;
         }
 
@@ -169,10 +177,10 @@ namespace jopm
             modelObject.AddMember(rj::StringRef("sizeIndex"), i.m_sizeIndex, modeldoc.GetAllocator())["sizeIndex"];
         }
 
-//        auto& root = modeldoc.AddMember(rj::StringRef("nodes"), rj::kArrayType, modeldoc.GetAllocator())["nodes"];
+        //        auto& root = modeldoc.AddMember(rj::StringRef("nodes"), rj::kArrayType, modeldoc.GetAllocator())["nodes"];
 
         scene.mRootNode->mName = "rootnode";
-        makeNodes(*scene.mRootNode, model.m_meshes, model.m_materials, modeldoc, modeldoc);
+        makeNodes(*scene.mRootNode, model.m_meshes, model.m_materials, modeldoc.GetAllocator(), modeldoc);
 
 
         //write json to file
@@ -199,7 +207,166 @@ namespace jopm
         jopmat.m_reflections[refTypeIndex * 4 + 3] = 1.0;
     }
 
-    void Converter::getMaterials(const aiScene* scene, Model& model)
+    std::string Converter::getTexture(const char* argv[], const std::string texPath)
+    {
+        std::string root = argv[0];
+        std::string searchLoc = argv[1];
+        std::string newFolder;
+        std::string exclude;
+        std::string texLoc;
+        std::string textureName = texPath;
+        //texLoc =/= textureName because needs to have an empty string
+        // .empty() fails otherwise
+        // can't compare because what if same name / path on both
+
+        int texFolder = 0;
+        int lastFolder = -1;
+        int lastDot = -1;
+
+        for (size_t i = 0; i < texPath.size(); ++i)
+        {
+            if (texPath[i] == '/' || texPath[i] == '\\' || texPath[i] == './' || texPath[i] == '.\\')
+                texFolder = i;
+        }
+        textureName = textureName.substr(texFolder + 1, textureName.size()); //works
+
+
+        for (size_t i = 0; i < searchLoc.size(); ++i)
+        {
+            if (searchLoc[i] == '/' || searchLoc[i] == '\\' || searchLoc[i] == './' || searchLoc[i] == '.\\')
+                lastFolder = i;
+            else if (searchLoc[i] == '.')
+                lastDot = i;
+        }
+        if (lastDot == -1)
+        {
+            printf("Unknown parameters");
+            return texLoc;
+        }
+
+        exclude = searchLoc.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //folder name to create
+
+        if (lastFolder != -1)
+        {
+            searchLoc.resize(lastFolder);                                           //path to base model
+        }
+
+        else
+        {
+            for (size_t i = 0; i < root.size(); ++i)
+            {
+                if (root[i] == '/' || root[i] == '\\' || root[i] == './' || root[i] == '.\\')
+                    lastFolder = i;
+            }
+            root.resize(lastFolder);
+            searchLoc = root;
+        }
+
+        newFolder = searchLoc + '\\' + exclude;
+
+        //Check quickly if there is already a correct folder...
+        DIR *dir;
+        struct dirent *ent;
+        bool foundTex = false;
+        if ((dir = opendir(newFolder.c_str())) != NULL)
+        {
+            //...and does it have the correct file...
+            while ((ent = readdir(dir)) != NULL)
+            {
+                if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..")
+                {
+                    if (ent->d_type == DT_UNKNOWN || ent->d_type == DT_REG)
+                    {
+                        if (std::string(ent->d_name) == textureName)
+                        {
+                            //texture found
+                            texLoc = newFolder + '\\' + textureName;
+                            foundTex = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        //...if not, go find the texture location
+        if (!foundTex)
+        {
+            //The Search
+            texLoc = findTexture(searchLoc, textureName);
+
+
+            if (!texLoc.empty())
+            {
+                _mkdir(newFolder.c_str());
+
+                std::ifstream src(texLoc, std::ios::binary);
+                std::ofstream dest(newFolder + '\\' + textureName, std::ios::binary);
+                dest << src.rdbuf();
+                src.close();
+                dest.close();
+
+                //needs moar safetychecks
+            }
+            else
+            {
+                //jop_error
+                printf("Failed to find model\n");
+            }
+        }
+
+        //Changing the path to be compatible with the Jopnal engine
+        for (size_t i = 0; i < texLoc.size(); ++i)
+        {
+            if (texLoc[i] == '\\' || texLoc[i] == './' || texLoc[i] == '.\\')
+            {
+                texLoc[i] = '/'; //this ok?
+            }
+        }
+        return texLoc;
+    }
+
+    std::string Converter::findTexture(const std::string searchDir, const std::string texName)
+    {
+        DIR *dir;
+        struct dirent *ent;
+
+        //Anyone here?
+        if ((dir = opendir(searchDir.c_str())) != NULL)
+        {
+            //Are we there yet?
+            while ((ent = readdir(dir)) != NULL)
+            {
+                if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..")
+                {
+                    switch (ent->d_type)
+                    {
+                    case DT_UNKNOWN:
+                    case DT_REG:
+                    {
+                        //check file
+                        if (std::string(ent->d_name) == texName)
+                        {
+                            //texture found
+                            return searchDir + '\\' + ent->d_name;
+                        }
+                        break;
+                    }
+                    //go check the subfolder
+                    case DT_DIR:
+                    {
+                        std::string temp = findTexture(searchDir + '\\' + ent->d_name, texName);
+                        if (!temp.empty())
+                            return temp;
+                    }
+                    }
+                }
+            }
+        }
+        return "";
+    }
+
+    void Converter::getMaterials(const aiScene* scene, Model& model, const char* argv[])
     {
         aiColor3D col;
 
@@ -267,6 +434,7 @@ namespace jopm
                 }
             };
 
+            //srgb && mipmaps?
 
             //Types
             {
@@ -278,7 +446,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -292,7 +460,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -306,7 +474,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -320,7 +488,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -334,7 +502,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -348,7 +516,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -393,7 +561,7 @@ namespace jopm
                         else
                             continue;
 
-                        joptexture.m_texturePath = path.C_Str();
+                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
                         joptexture.m_type = static_cast<int>(map);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -545,7 +713,7 @@ namespace jopm
         }
     }
 
-    int Converter::conversion(const int argc, char* argv[])
+    int Converter::conversion(const int argc, const char* argv[])
     {
         if (argc > 1)
         {
@@ -579,11 +747,10 @@ namespace jopm
 
 
             Assimp::Importer imp;
-            //imp.SetExtraVerbose(true);
             printf("Loading model...\n");
             unsigned int kek = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
             imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, kek);
-            const aiScene *scene = imp.ReadFile(pathIn, aiProcess_RemoveComponent | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_OptimizeGraph | aiProcess_RemoveRedundantMaterials | aiProcess_ValidateDataStructure);
+            const aiScene *scene = imp.ReadFile(pathIn, aiProcess_RemoveComponent | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType /*| aiProcess_OptimizeGraph*/ | aiProcess_RemoveRedundantMaterials | aiProcess_ValidateDataStructure);
             if (!scene) {
                 printf("Unable to load mesh: %s\n", imp.GetErrorString());
                 return false;
@@ -592,7 +759,7 @@ namespace jopm
             Model model;
 
 
-            conv.getMaterials(scene, model);
+            conv.getMaterials(scene, model, argv);
             conv.getMeshes(scene, model);
             if (conv.jsonWriter(*scene, model, fileOut) && conv.binaryWriter(model, fileOut))
             {

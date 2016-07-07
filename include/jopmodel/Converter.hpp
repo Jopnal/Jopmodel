@@ -33,6 +33,8 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 
+#include <dirent/dirent.h>
+
 #include <jopmodel/Model.hpp>
 #include <jopmodel/Material.hpp>
 #include <jopmodel/Texture.hpp>
@@ -51,32 +53,37 @@ namespace jopm
 		Converter();
 		~Converter();
 
-        bool makeNodes(const aiNode& parentNode, const std::vector<const Mesh>& meshes, const std::vector<const Material>& mats, rapidjson::Document& modeldoc);
+        bool processNode(aiNode& node, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root, rapidjson::Value*& out);
 
-        bool processNode(const aiNode& node, const std::vector<const Mesh>& meshes, const std::vector<const Material>& mats, rapidjson::Document& modeldoc);
+        bool makeNodes(aiNode& parentNode, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root);
 
-		bool binaryWriter(Model& model, const std::string fileOut);
+        bool binaryWriter(Model& model, std::string fileOut);
 
-		bool jsonWriter(Model& model, const std::string fileOut);
+        bool jsonWriter(const aiScene& scene, Model& model, std::string fileOut);
 
-		bool binaryReader(std::string const fileOut);
+        bool binaryReader(std::string fileOut);
 
-		void pushReflections(Material &jopmat, const aiColor3D col, const int refTypeIndex);
+        void pushReflections(Material &jopmat, aiColor3D col, int refTypeIndex);
 
-		void getMaterials(const aiScene* scene, const Model& model);
-		
-		void getMeshes(const aiScene* scene, Model& model);
+        std::string getTexture(const char* argv[], const std::string texPath);
 
-		/// \brief Model converter
-		///
-		/// This will convert a model file into jopmodel format
-		/// argv[1]: model file to convert
-		/// argv[2]: (Optional) name for the new model file
-		///
-		/// \param argc Argc from main()
-		/// \param argv Argv[] from main()
-		///
-		static int conversion(int argc, char* argv[]);
+        std::string findTexture(DIR *&dir, struct dirent *&ent, const std::string searchDir, const std::string texName);
+
+        void getMaterials(const aiScene* scene, Model& model, const char* argv[]);
+
+        void getMeshes(const aiScene* scene, Model& model);
+
+
+        /// \brief Model converter
+        ///
+        /// This will convert a model file into jopmodel format
+        /// argv[1]: model file to convert
+        /// argv[2]: (Optional) name for the new model file
+        ///
+        /// \param argc Argc from main()
+        /// \param argv Argv[] from main()
+        ///
+        static int conversion(const int argc, const char* argv[]);
 
 	};
 }

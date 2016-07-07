@@ -157,6 +157,8 @@ namespace jopm
                 auto& textureObject = texturesArray.AddMember(rj::StringRef(l.m_texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[l.m_texturePath.c_str()];
                 textureObject.AddMember(rj::StringRef("type"), l.m_type, modeldoc.GetAllocator())["type"];
                 textureObject.AddMember(rj::StringRef("wrapmode"), l.m_wrapmode, modeldoc.GetAllocator())["wrapmode"];
+                textureObject.AddMember(rj::StringRef("srgb"), l.m_srgb, modeldoc.GetAllocator())["srgb"];
+                textureObject.AddMember(rj::StringRef("genmipmaps"), l.m_genmipmaps, modeldoc.GetAllocator())["genmipmaps"];
             }
         }
 
@@ -184,7 +186,9 @@ namespace jopm
 
 
         //write json to file
-        std::ofstream file(fileOut);
+        std::ofstream file(fileOut, std::ofstream::trunc);
+        file.close();
+        file.open(fileOut, std::ofstream::out);
         if (file.is_open())
         {
             rapidjson::StringBuffer mdbuff;
@@ -207,68 +211,28 @@ namespace jopm
         jopmat.m_reflections[refTypeIndex * 4 + 3] = 1.0;
     }
 
-    std::string Converter::getTexture(const char* argv[], const std::string texPath)
+    std::string Converter::getTexture(const std::string texPath)
     {
-        std::string root = argv[0];
-        std::string searchLoc = argv[1];
         std::string newFolder;
-        std::string exclude;
         std::string texLoc;
         std::string textureName = texPath;
-        //texLoc =/= textureName because needs to have an empty string
-        // .empty() fails otherwise
-        // can't compare because what if same name / path on both
+        int texFolder = -1;
 
-        int texFolder = 0;
-        int lastFolder = -1;
-        int lastDot = -1;
-
+        //get the name of the texture resource
         for (size_t i = 0; i < texPath.size(); ++i)
         {
             if (texPath[i] == '/' || texPath[i] == '\\' || texPath[i] == './' || texPath[i] == '.\\')
                 texFolder = i;
         }
-        textureName = textureName.substr(texFolder + 1, textureName.size()); //works
 
-
-        for (size_t i = 0; i < searchLoc.size(); ++i)
-        {
-            if (searchLoc[i] == '/' || searchLoc[i] == '\\' || searchLoc[i] == './' || searchLoc[i] == '.\\')
-                lastFolder = i;
-            else if (searchLoc[i] == '.')
-                lastDot = i;
-        }
-        if (lastDot == -1)
-        {
-            printf("Unknown parameters");
-            return texLoc;
-        }
-
-        exclude = searchLoc.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //folder name to create
-
-        if (lastFolder != -1)
-        {
-            searchLoc.resize(lastFolder);                                           //path to base model
-        }
-
-        else
-        {
-            for (size_t i = 0; i < root.size(); ++i)
-            {
-                if (root[i] == '/' || root[i] == '\\' || root[i] == './' || root[i] == '.\\')
-                    lastFolder = i;
-            }
-            root.resize(lastFolder);
-            searchLoc = root;
-        }
-
-        newFolder = searchLoc + '\\' + exclude;
+        textureName = textureName.substr(texFolder + 1, textureName.size());
+        newFolder = m_searchLoc + '\\' + m_modelName;
 
         //Check quickly if there is already a correct folder...
         DIR *dir;
         struct dirent *ent;
         bool foundTex = false;
-        if ((dir = opendir(newFolder.c_str())) != NULL)
+        if ((dir = opendir(m_outputDir.c_str())) != NULL)
         {
             //...and does it have the correct file...
             while ((ent = readdir(dir)) != NULL)
@@ -280,7 +244,6 @@ namespace jopm
                         if (std::string(ent->d_name) == textureName)
                         {
                             //texture found
-                            texLoc = newFolder + '\\' + textureName;
                             foundTex = true;
                             break;
                         }
@@ -293,15 +256,12 @@ namespace jopm
         if (!foundTex)
         {
             //The Search
-            texLoc = findTexture(searchLoc, textureName);
-
+            texLoc = findTexture(m_searchLoc, textureName);
 
             if (!texLoc.empty())
             {
-                _mkdir(newFolder.c_str());
-
                 std::ifstream src(texLoc, std::ios::binary);
-                std::ofstream dest(newFolder + '\\' + textureName, std::ios::binary);
+                std::ofstream dest(m_outputDir.empty() ? texLoc : (m_outputDir + '\\' + textureName), std::ios::binary | std::ios::trunc);
                 dest << src.rdbuf();
                 src.close();
                 dest.close();
@@ -311,19 +271,12 @@ namespace jopm
             else
             {
                 //jop_error
-                printf("Failed to find model\n");
+                printf("Failed to find texture\n");
             }
         }
 
         //Changing the path to be compatible with the Jopnal engine
-        for (size_t i = 0; i < texLoc.size(); ++i)
-        {
-            if (texLoc[i] == '\\' || texLoc[i] == './' || texLoc[i] == '.\\')
-            {
-                texLoc[i] = '/'; //this ok?
-            }
-        }
-        return texLoc;
+        return m_modelName + '/' + textureName;
     }
 
     std::string Converter::findTexture(const std::string searchDir, const std::string texName)
@@ -366,7 +319,7 @@ namespace jopm
         return "";
     }
 
-    void Converter::getMaterials(const aiScene* scene, Model& model, const char* argv[])
+    void Converter::getMaterials(const aiScene* scene, Model& model)
     {
         aiColor3D col;
 
@@ -434,7 +387,7 @@ namespace jopm
                 }
             };
 
-            //srgb && mipmaps?
+            //mipmaps default to true
 
             //Types
             {
@@ -446,9 +399,10 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         jopmaterial.m_textures.push_back(joptexture);
+                        jopmaterial.m_srgb = true;
                     }
                 }
 
@@ -460,7 +414,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -474,7 +428,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -488,9 +442,10 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         jopmaterial.m_textures.push_back(joptexture);
+                        jopmaterial.m_srgb = true;
                     }
                 }
 
@@ -502,7 +457,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -516,7 +471,7 @@ namespace jopm
 
                     if (path.length)
                     {
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -561,7 +516,7 @@ namespace jopm
                         else
                             continue;
 
-                        joptexture.m_texturePath = getTexture(argv, path.C_Str());
+                        joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(map);
                         jopmaterial.m_textures.push_back(joptexture);
                     }
@@ -713,43 +668,191 @@ namespace jopm
         }
     }
 
+    std::string Converter::sortArgs(const int argc, const char* argv[])
+    {
+        std::string searchLoc = argv[1];
+        std::string modelName = argv[1];
+        std::string fileOutPath;
+        std::string temproot;
+
+        int lastFolder = -1;
+        int lastDot = -1;
+        bool fromRoot = false;
+
+        //execution path
+        {
+            std::vector<wchar_t> pathBuffer;
+            DWORD copied = 0;
+            do {
+                pathBuffer.resize(pathBuffer.size() + MAX_PATH);
+                copied = GetModuleFileName(0, &pathBuffer.at(0), pathBuffer.size());
+            } while (copied >= pathBuffer.size());
+
+            pathBuffer.resize(copied);
+
+            temproot = std::string(pathBuffer.begin(), pathBuffer.end());
+
+            for (size_t i = 0; i < temproot.size(); ++i)
+            {
+                if (temproot[i] == '/' || temproot[i] == '\\' || temproot[i] == './' || temproot[i] == '.\\')
+                    lastFolder = i;
+            }
+            temproot.resize(lastFolder);
+        }
+        //~execution path
+
+
+        //argv[1]
+        {
+            //find out what kind of path we are given
+            lastFolder = -1;
+            for (size_t i = 0; i < searchLoc.size(); ++i)
+            {
+                if (searchLoc[i] == '/' || searchLoc[i] == '\\' || searchLoc[i] == './' || searchLoc[i] == '.\\')
+                    lastFolder = i;
+                else if (searchLoc[i] == '.')
+                    lastDot = i;
+                else if (searchLoc[i] == ':')
+                    fromRoot = true;
+            }
+
+            m_modelName = modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //name of the model == folder name to create - works
+
+            //given argv[1] doesn't seem to be a file
+            if (lastDot == -1)
+            {
+                printf("Unknown parameters"); //fix so that * can be used
+                searchLoc.clear();
+            }
+
+            //no directory structure was given, starting from working directory --- konv model.jop
+            if (lastFolder == -1)
+            {
+                searchLoc = temproot;
+            }
+            //A directory structure was given, starting from drive root --- konv C:\Program Files\...
+            else if (fromRoot == true)
+            {
+                searchLoc.resize(lastFolder);   //path to base model
+            }
+            //A directory structure was given but it doesn't start from root --- konv stuff/model.jop
+            else
+            {
+                searchLoc.resize(lastFolder);
+                searchLoc = temproot + '\\' + searchLoc;
+            }
+            m_searchLoc = searchLoc;
+        }
+        //~argv[1]
+
+        //argv[2]
+        {
+            if (argc > 2)
+            {
+                m_modelName = argv[2];
+                fileOutPath = argv[2];
+
+                lastFolder = -1;
+                lastDot = -1;
+                fromRoot = false;
+
+                //find out what kind of path we are given
+                for (size_t i = 0; i < fileOutPath.size(); ++i)
+                {
+                    if (fileOutPath[i] == '/' || fileOutPath[i] == '\\' || fileOutPath[i] == './' || fileOutPath[i] == '.\\')
+                        lastFolder = i;
+                    else if (fileOutPath[i] == '.')
+                        lastDot = i;
+                    else if (fileOutPath[i] == ':')
+                        fromRoot = true;
+                }
+
+                if (lastDot != -1 && !fromRoot)
+                {
+                    fileOutPath.resize(lastDot);
+                    fileOutPath = temproot + '\\' + fileOutPath;
+                    m_modelName = m_modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1));
+                }
+                else if (lastDot != -1 && fromRoot)
+                {
+                    fileOutPath.resize(lastDot);
+                    m_modelName = m_modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1));
+                }
+                else if (lastFolder != -1 && !fromRoot)
+                {
+                    fileOutPath = temproot + '\\' + fileOutPath;
+                    m_modelName = m_modelName.substr(lastFolder + 1, m_modelName.size());
+                }
+                else if (lastFolder != -1)
+                {
+                    m_modelName = m_modelName.substr(lastFolder + 1, m_modelName.size());
+                }
+
+                
+
+                //create the directory tree user specified as argv[2]
+                fileOutPath += '\\';
+                std::string tempPath = fileOutPath;
+                for (size_t i = 0; i < fileOutPath.size(); ++i)
+                {
+                    if (fileOutPath[i] == '\\')
+                    {
+                        tempPath.resize(i);
+                        _mkdir(tempPath.c_str());
+                        tempPath = fileOutPath;
+                    }
+                }
+                _mkdir((tempPath + m_modelName).c_str());
+                m_outputDir = fileOutPath + m_modelName;
+                
+            }
+            else
+            {
+                fileOutPath = searchLoc;
+                _mkdir((fileOutPath + '\\' + m_modelName).c_str());
+                m_outputDir = fileOutPath + '\\' + m_modelName;
+            }
+        }
+        //~argv[2]
+
+        return fileOutPath + '\\' + m_modelName;
+    }
+
     int Converter::conversion(const int argc, const char* argv[])
     {
         if (argc > 1)
         {
-            std::string pathIn = argv[1];
-            Converter conv;
-            std::string fileOut;
-
             if (argv[1] == "-h" || argv[1] == "/h" || argv[1] == "-help" || argv[1] == "/help")
             {
                 printf("konv:\n First argument: file to load\n(Optional) Second argument: filename to write out");
                 return 0;
             }
 
-            if (argc > 2)
+            Converter conv;
+            std::string pathIn = argv[1];
+            std::string fileOut = conv.sortArgs(argc, argv);
+
+            short unsigned int folder = 0;
+            std::string tempOut = fileOut;
+            for (size_t i = 0; i < tempOut.size(); ++i)
             {
-                fileOut = argv[2];
-                fileOut += ".jop";
+                if (tempOut[i] == '\\')
+                {
+                    folder = i;
+                }
             }
-            else
-            {
-                fileOut = "model.jop";
-            }
+            tempOut.resize(folder);
+            tempOut += "\\log.txt";
 
-
-            //read old model file with assimp
-
-            Assimp::DefaultLogger::create("LOKI.txt", Assimp::DefaultLogger::VERBOSE); //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            Assimp::DefaultLogger::create(tempOut.c_str(), Assimp::DefaultLogger::VERBOSE);
             Assimp::DefaultLogger::get()->setLogSeverity(Assimp::DefaultLogger::LogSeverity::VERBOSE);
 
-
-
-
+            //read old model file with assimp
             Assimp::Importer imp;
+            unsigned int comps = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
+            imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, comps);
+
             printf("Loading model...\n");
-            unsigned int kek = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
-            imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, kek);
             const aiScene *scene = imp.ReadFile(pathIn, aiProcess_RemoveComponent | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType /*| aiProcess_OptimizeGraph*/ | aiProcess_RemoveRedundantMaterials | aiProcess_ValidateDataStructure);
             if (!scene) {
                 printf("Unable to load mesh: %s\n", imp.GetErrorString());
@@ -758,8 +861,7 @@ namespace jopm
 
             Model model;
 
-
-            conv.getMaterials(scene, model, argv);
+            conv.getMaterials(scene, model);
             conv.getMeshes(scene, model);
             if (conv.jsonWriter(*scene, model, fileOut) && conv.binaryWriter(model, fileOut))
             {

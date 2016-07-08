@@ -271,7 +271,7 @@ namespace jopm
             else
             {
                 //jop_error
-                printf("Failed to find texture\n");
+                std::cout << "Failed to find texture: " << textureName << std::endl;
             }
         }
 
@@ -668,7 +668,7 @@ namespace jopm
         }
     }
 
-    std::string Converter::sortArgs(const int argc, const char* argv[])
+    std::string Converter::sortPaths(const int argc, const char* argv[])
     {
         std::string searchLoc = argv[1];
         std::string modelName = argv[1];
@@ -788,7 +788,7 @@ namespace jopm
                     m_modelName = m_modelName.substr(lastFolder + 1, m_modelName.size());
                 }
 
-                
+
 
                 //create the directory tree user specified as argv[2]
                 fileOutPath += '\\';
@@ -804,7 +804,7 @@ namespace jopm
                 }
                 _mkdir((tempPath + m_modelName).c_str());
                 m_outputDir = fileOutPath + m_modelName;
-                
+
             }
             else
             {
@@ -822,43 +822,76 @@ namespace jopm
     {
         if (argc > 1)
         {
+            //std::vector<unsigned int>  sortArgs(argc, argv);
+
             if (argv[1] == "-h" || argv[1] == "/h" || argv[1] == "-help" || argv[1] == "/help")
             {
                 printf("konv:\n First argument: file to load\n(Optional) Second argument: filename to write out");
                 return 0;
             }
 
+            Assimp::DefaultLogger::set(new detail::Logger);
+
+            HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+
+            CONSOLE_SCREEN_BUFFER_INFOEX info;
+            std::memset(&info, 0, sizeof(info));
+            info.cbSize = sizeof(info);
+
+            CONSOLE_FONT_INFOEX font;
+            std::memset(&font, 0, sizeof(font));
+            font.cbSize = sizeof(font);
+
+            //Makes it tall & thin
+            // if (!GetConsoleScreenBufferInfoEx(consoleHandle, &info) || !GetCurrentConsoleFontEx(consoleHandle, FALSE, &font))
+            //     return 1;
+
+
+            auto consoleSize = GetLargestConsoleWindowSize(consoleHandle);
+            consoleSize.X *= 0.9;
+            consoleSize.Y *= 0.9;
+
+
+            SetConsoleScreenBufferSize(consoleHandle, { consoleSize.X, consoleSize.Y *= 9 });
+
+            ShowWindow(GetConsoleWindow(), SW_MAXIMIZE);
+
+            //Makes no difference
+            {
+                RECT consoleSize;
+                GetWindowRect(GetConsoleWindow(), &consoleSize);
+
+                SetConsoleScreenBufferInfoEx(consoleHandle, &info);
+                SetCurrentConsoleFontEx(consoleHandle, FALSE, &font);
+            }
+
+
+
             Converter conv;
             std::string pathIn = argv[1];
-            std::string fileOut = conv.sortArgs(argc, argv);
+            std::string fileOut = conv.sortPaths(argc, argv);
 
-            short unsigned int folder = 0;
-            std::string tempOut = fileOut;
-            for (size_t i = 0; i < tempOut.size(); ++i)
-            {
-                if (tempOut[i] == '\\')
-                {
-                    folder = i;
-                }
-            }
-            tempOut.resize(folder);
-            tempOut += "\\log.txt";
-
-            Assimp::DefaultLogger::create(tempOut.c_str(), Assimp::DefaultLogger::VERBOSE);
-            Assimp::DefaultLogger::get()->setLogSeverity(Assimp::DefaultLogger::LogSeverity::VERBOSE);
 
             //read old model file with assimp
             Assimp::Importer imp;
+
             unsigned int comps = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
             imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, comps);
+            imp.SetPropertyInteger(AI_CONFIG_GLOB_MEASURE_TIME, 1);
 
             printf("Loading model...\n");
-            const aiScene *scene = imp.ReadFile(pathIn, aiProcess_RemoveComponent | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType /*| aiProcess_OptimizeGraph*/ | aiProcess_RemoveRedundantMaterials | aiProcess_ValidateDataStructure);
+            const aiScene *scene = imp.ReadFile(pathIn, aiProcess_RemoveComponent | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices
+                | aiProcess_SortByPType | aiProcess_OptimizeGraph | aiProcess_RemoveRedundantMaterials | aiProcess_ValidateDataStructure);
             if (!scene) {
+                SetConsoleTextAttribute(consoleHandle, FOREGROUND_RED);
                 printf("Unable to load mesh: %s\n", imp.GetErrorString());
+                SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+                Assimp::DefaultLogger::kill();
                 return false;
             }
-
+            Assimp::DefaultLogger::kill();
+            SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
             Model model;
 
             conv.getMaterials(scene, model);

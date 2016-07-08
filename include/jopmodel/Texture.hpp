@@ -42,6 +42,8 @@ namespace jopm
 		std::string m_texturePath;
 		int m_type = 0; //diffuse, specular etc.
 		int m_wrapmode = 0; //repeat, clamp etc.
+        bool m_srgb = false;
+        bool m_genmipmaps = true;
 	};
 }
 #endif

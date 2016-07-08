@@ -401,8 +401,8 @@ namespace jopm
                     {
                         joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
+                        joptexture.m_srgb = true;
                         jopmaterial.m_textures.push_back(joptexture);
-                        jopmaterial.m_srgb = true;
                     }
                 }
 
@@ -444,8 +444,8 @@ namespace jopm
                     {
                         joptexture.m_texturePath = getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
+                        joptexture.m_srgb = true;
                         jopmaterial.m_textures.push_back(joptexture);
-                        jopmaterial.m_srgb = true;
                     }
                 }
 
@@ -815,7 +815,7 @@ namespace jopm
         }
         //~argv[2]
 
-        return fileOutPath + '\\' + m_modelName;
+        return fileOutPath + '\\' + m_modelName + ".jop";
     }
 
     int Converter::conversion(const int argc, const char* argv[])

@@ -40,11 +40,12 @@ namespace jopm
 
 		friend class Converter;
 
-        bool m_srgb = false;
+        
 		float m_reflections[16];
 		float m_shininess = 1.0f;
 		float m_reflectivity = 0.0f;
-		std::vector<Texture*> m_textures;
+		std::vector<Texture> m_textures;
+
 	};
 }
 #endif

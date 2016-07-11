@@ -44,6 +44,10 @@ namespace jopm
 		int m_wrapmode = 0; //repeat, clamp etc.
         bool m_srgb = false;
         bool m_genmipmaps = true;
+
+        
+        //unsigned int m_texStart = 0;
+        //unsigned int m_texLength = 0;
 	};
 }
 #endif

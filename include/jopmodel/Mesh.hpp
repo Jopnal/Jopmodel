@@ -49,11 +49,11 @@ namespace jopm
 		int m_type; //triangles, lines etc.
 		uint32_t m_components = 0; //bitfield
 
-		unsigned int m_startIndex = 0;
-		unsigned int m_start = 0;
-		unsigned int m_lengthIndex = 0;
-		unsigned int m_length = 0; //bytes
-        unsigned int m_sizeIndex = 0;
-    };
+		unsigned int m_meshStartIndex = 0;
+		unsigned int m_meshStart = 0;
+		unsigned int m_meshLengthIndex = 0;
+		unsigned int m_meshLength = 0; //bytes
+        unsigned int m_meshSizeIndex = 0;
+	};
 }
 #endif

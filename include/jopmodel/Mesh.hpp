@@ -25,6 +25,7 @@
 //Headers
 #include <cstdint>
 #include <vector>
+#include <glm/glm.hpp>
 
 //////////////////////////////////////////////
 
@@ -54,6 +55,9 @@ namespace jopm
 		unsigned int m_meshLengthIndex = 0;
 		unsigned int m_meshLength = 0; //bytes
         unsigned int m_meshSizeIndex = 0;
+
+        //1. minimum BB, 2. maximum BB
+        std::pair<glm::vec3, glm::vec3> m_localBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(FLT_MIN, FLT_MIN, FLT_MIN));
 	};
 }
 #endif

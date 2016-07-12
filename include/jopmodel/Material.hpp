@@ -23,7 +23,6 @@
 #define JOPM_MATERIAL_HPP
 
 //Headers
-#include <jopmodel/Texture.hpp>
 #include <cstdint>
 #include <vector>
 
@@ -43,7 +42,8 @@ namespace jopm
 		float m_reflections[16];
 		float m_shininess = 1.0f;
 		float m_reflectivity = 0.0f;
-		std::vector<Texture> m_textures;
+
+        std::vector<std::pair<std::string, unsigned int>> m_keypairs;
 	};
 }
 #endif

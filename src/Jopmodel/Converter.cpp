@@ -40,25 +40,29 @@ namespace jopm
     {
     }
 
-    bool Converter::binaryWriter(Model& model, const std::string& fileOut)
+    bool Converter::binaryWriter(const Model& model, const std::string& fileOut)
     {
         std::ofstream writeFile(fileOut, std::ios::binary | std::ios::out | std::ios::app | std::ios::ate);
         if (writeFile.is_open())
         {
-            for (int i = 0; i < m_textureWithSize.size(); ++i)
+            if (m_embedTex)
             {
-                std::ifstream texFile(std::get<0>(m_textureWithSize[i]), std::ios::binary | std::ios::in);
-                if (texFile.is_open())
+                for (auto& i : m_textures)
                 {
-                    writeFile << texFile.rdbuf();
-                    //writeFile.write(reinterpret_cast<const char*>(texFile.rdbuf()), std::get<2>(m_textureWithSize[i]) - std::get<1>(m_textureWithSize[i]));
-                    texFile.clear();
-                    texFile.close();
+                    i.second.m_texturePath.erase(i.second.m_texturePath.begin(), i.second.m_texturePath.begin() + i.second.m_texturePath.find_last_of('/') + 1);
+
+                    std::ifstream texFile(m_searchLoc + '\\' + i.second.m_texturePath, std::ios::binary | std::ios::in);
+                    if (texFile.is_open())
+                    {
+                        writeFile << texFile.rdbuf();
+                        //writeFile.write(reinterpret_cast<const char*>(texFile.rdbuf()), std::get<2>(m_textureWithSize[i]) - std::get<1>(m_textureWithSize[i]));
+                        texFile.clear();
+                        texFile.close();
+                    }
+                    else
+                        std::cout << "Failed to open file \"" << i.second.m_texturePath << "\" for reading" << std::endl;
                 }
             }
-
-            model.m_meshes[0].m_vertexBuffer[0] = writeFile.tellp();
-
             for (auto& j : model.m_meshes)
             {
                 writeFile.write(reinterpret_cast<const char*>(j.m_vertexBuffer.data()), j.m_meshLength);
@@ -67,6 +71,8 @@ namespace jopm
             writeFile.close();
             return true;
         }
+        else
+            std::cout << "Failed to open file \"" << fileOut << "\" for reading" << std::endl;
         printf("Writing binary failed\n");
         return false;
     }
@@ -146,18 +152,34 @@ namespace jopm
         modeldoc.SetObject();
 
         //MAIN TEXTUREARRAY
-        auto& texArray = modeldoc.AddMember(rj::StringRef("textures"), rj::kArrayType, modeldoc.GetAllocator());
-        auto& texObject = texArray.AddMember(rj::StringRef(m_textureName.c_str()), rj::kObjectType, modeldoc.GetAllocator())[m_textureName.c_str()];
-        if (m_embedTex)
+        auto& texArray = modeldoc.AddMember(rj::StringRef("textures"), rj::kObjectType, modeldoc.GetAllocator())["textures"];
+        for (auto& j : m_textures)
         {
-            for (int i = 0; i < m_textureWithSize.size(); ++i)
+            auto& texObject = texArray.AddMember(rj::StringRef(j.second.m_texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[j.second.m_texturePath.c_str()];
+
+            if (m_embedTex)
             {
-                texObject.AddMember(rj::StringRef("start"), std::get<1>(m_textureWithSize[i]), modeldoc.GetAllocator());
-                texObject.AddMember(rj::StringRef("length"), std::get<2>(m_textureWithSize[i]), modeldoc.GetAllocator());
+                texObject.AddMember(rj::StringRef("start"), j.second.m_texStart, modeldoc.GetAllocator());
+                texObject.AddMember(rj::StringRef("length"), j.second.m_texLength, modeldoc.GetAllocator());
             }
+            else
+            {
+                texObject.AddMember(rj::StringRef("path"), rj::Value((m_modelName + '/' + m_textureName).c_str(), modeldoc.GetAllocator()), modeldoc.GetAllocator());
+            }
+            texObject.AddMember(rj::StringRef("wrapmode"), j.second.m_wrapmode, modeldoc.GetAllocator());
+            texObject.AddMember(rj::StringRef("srgb"), j.second.m_srgb, modeldoc.GetAllocator());
+            texObject.AddMember(rj::StringRef("genmipmaps"), j.second.m_genmipmaps, modeldoc.GetAllocator());
         }
-        else
-            texObject.AddMember(rj::StringRef("path"), rj::Value((m_modelName + "/" + m_textureName).c_str(), modeldoc.GetAllocator()), modeldoc.GetAllocator());
+
+        //GLOBAL AABB
+        auto& globalBBarray = modeldoc.AddMember(rj::StringRef("globalaabb"), rj::kArrayType, modeldoc.GetAllocator())["globalaabb"];
+        globalBBarray.PushBack(m_globalBB.first.x, modeldoc.GetAllocator());
+        globalBBarray.PushBack(m_globalBB.first.y, modeldoc.GetAllocator());
+        globalBBarray.PushBack(m_globalBB.first.z, modeldoc.GetAllocator());
+        globalBBarray.PushBack(m_globalBB.second.x, modeldoc.GetAllocator());
+        globalBBarray.PushBack(m_globalBB.second.y, modeldoc.GetAllocator());
+        globalBBarray.PushBack(m_globalBB.second.z, modeldoc.GetAllocator());
+
 
         //MATERIALS
         auto& materialArray = modeldoc.AddMember(rj::StringRef("materials"), rj::kArrayType, modeldoc.GetAllocator())["materials"];
@@ -176,28 +198,15 @@ namespace jopm
 
             materialObject.AddMember(rj::StringRef("shininess"), j.m_shininess, modeldoc.GetAllocator());
             materialObject.AddMember(rj::StringRef("reflectivity"), j.m_reflectivity, modeldoc.GetAllocator());
-            materialObject.AddMember(rj::StringRef("embedTex"), m_embedTex, modeldoc.GetAllocator());
-
-
-            //LOCAL BB
-            auto& localBBarray = materialObject.AddMember(rj::StringRef("localBB"), rj::kArrayType, modeldoc.GetAllocator())["localBB"];
-            localBBarray.PushBack(m_localBB.first.x, modeldoc.GetAllocator());
-            localBBarray.PushBack(m_localBB.first.y, modeldoc.GetAllocator());
-            localBBarray.PushBack(m_localBB.first.z, modeldoc.GetAllocator());
-            localBBarray.PushBack(m_localBB.second.x, modeldoc.GetAllocator());
-            localBBarray.PushBack(m_localBB.second.y, modeldoc.GetAllocator());
-            localBBarray.PushBack(m_localBB.second.z, modeldoc.GetAllocator());
 
 
             //TEXTUREARRAY IN MATERIAL
             auto& texturesArray = materialObject.AddMember(rj::StringRef("textures"), rj::kObjectType, modeldoc.GetAllocator())["textures"];
-            for (auto& l : j.m_textures)
+
+            for (auto& l : j.m_keypairs)
             {
-                auto& textureObject = texturesArray.AddMember(rj::StringRef(l.m_texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[l.m_texturePath.c_str()];
-                textureObject.AddMember(rj::StringRef("type"), l.m_type, modeldoc.GetAllocator());
-                textureObject.AddMember(rj::StringRef("wrapmode"), l.m_wrapmode, modeldoc.GetAllocator());
-                textureObject.AddMember(rj::StringRef("srgb"), l.m_srgb, modeldoc.GetAllocator());
-                textureObject.AddMember(rj::StringRef("genmipmaps"), l.m_genmipmaps, modeldoc.GetAllocator());
+                auto& textureObject = texturesArray.AddMember(rj::StringRef(l.first.c_str()), rj::kObjectType, modeldoc.GetAllocator())[l.first.c_str()];
+                textureObject.AddMember(rj::StringRef("type"), l.second, modeldoc.GetAllocator());
             }
         }
 
@@ -217,6 +226,16 @@ namespace jopm
             modelObject.AddMember(rj::StringRef("startIndex"), i.m_meshStartIndex, modeldoc.GetAllocator());
             modelObject.AddMember(rj::StringRef("lengthIndex"), i.m_meshLengthIndex, modeldoc.GetAllocator());
             modelObject.AddMember(rj::StringRef("sizeIndex"), i.m_meshSizeIndex, modeldoc.GetAllocator());
+
+            //LOCAL BB
+            auto& localBBarray = modelObject.AddMember(rj::StringRef("aabb"), rj::kArrayType, modeldoc.GetAllocator())["aabb"];
+            localBBarray.PushBack(i.m_localBB.first.x, modeldoc.GetAllocator());
+            localBBarray.PushBack(i.m_localBB.first.y, modeldoc.GetAllocator());
+            localBBarray.PushBack(i.m_localBB.first.z, modeldoc.GetAllocator());
+            localBBarray.PushBack(i.m_localBB.second.x, modeldoc.GetAllocator());
+            localBBarray.PushBack(i.m_localBB.second.y, modeldoc.GetAllocator());
+            localBBarray.PushBack(i.m_localBB.second.z, modeldoc.GetAllocator());
+
         }
 
         scene.mRootNode->mName = "rootnode";
@@ -249,7 +268,7 @@ namespace jopm
         jopmat.m_reflections[refTypeIndex * 4 + 3] = 1.0;
     }
 
-    std::string Converter::getTexture(const std::string& texPath)
+    std::string Converter::getTexture(Material& jopmat, const std::string& texPath)
     {
         std::string texLoc;
         std::string textureName = texPath;
@@ -301,8 +320,11 @@ namespace jopm
                 std::ifstream src(texLoc, std::ios::binary);
                 if (m_embedTex)
                 {
-                    m_textureWithSize.push_back(std::make_tuple(texLoc, m_binaryWriter, src.rdbuf()->pubseekoff(0, src.end)));
+                    //get the size to write
+                    //m_textureWithSize.emplace_back(m_modelName + '/' + textureName, m_binaryWriter, src.rdbuf()->pubseekoff(0, src.end));
+                    unsigned int temp = m_binaryWriter;
                     m_binaryWriter += src.rdbuf()->pubseekoff(0, src.end);
+                    m_binaryLastSize = m_binaryWriter - temp;
                 }
                 else
                 {
@@ -318,7 +340,6 @@ namespace jopm
             }
         }
         m_textureName = textureName;
-
         //Changing the path to be compatible with the Jopnal engine
         return m_modelName + '/' + textureName;
     }
@@ -396,6 +417,11 @@ namespace jopm
                 jopmaterial.m_reflectivity = rf;
             }
 
+            auto textureExists = [](const std::unordered_map<std::string, Texture>& map, const std::string& path)
+            {
+                return map.find(path) != map.end();
+            };
+
             Texture joptexture;
 
             auto getFlags = [&aiMat, &joptexture](const aiTextureType aiType, const int ind, aiTextureFlags flags)
@@ -410,7 +436,6 @@ namespace jopm
 
                     break;
                 }
-
 
                 //Wrapmode
                 aiTextureMapMode mapMode;
@@ -441,12 +466,15 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_DIFFUSE, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         joptexture.m_srgb = true;
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -456,11 +484,14 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_SPECULAR, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -470,11 +501,14 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_SHININESS, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -484,12 +518,15 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_EMISSIVE, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         joptexture.m_srgb = true;
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -499,11 +536,14 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_REFLECTION, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -513,11 +553,14 @@ namespace jopm
                     aiString path;
                     aiMat.GetTexture(aiTextureType_OPACITY, 0, &path);
 
-                    if (path.length)
+                    if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(path.C_Str());
+                        joptexture.m_texStart = m_binaryWriter;
+                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
-                        jopmaterial.m_textures.push_back(joptexture);
+                        joptexture.m_texLength = m_binaryLastSize;
+                        m_textures[path.C_Str()] = joptexture;
+                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -527,42 +570,47 @@ namespace jopm
                     {
                         aiString path;
                         aiMat.GetTexture(aiTextureType_UNKNOWN, i, &path);
+                        if (path.length && !textureExists(m_textures, path.C_Str()))
+                        {
+                            using A = jop::Material::Attribute;
+                            using M = jop::Material::Map;
+                            M map;
 
-                        using A = jop::Material::Attribute;
-                        using M = jop::Material::Map;
-                        M map;
+                            // Diffuse
+                            if (strstr(path.C_Str(), "dif"))
+                                map = M::Diffuse;
 
-                        // Diffuse
-                        if (strstr(path.C_Str(), "dif"))
-                            map = M::Diffuse;
+                            // Specular
+                            else if (strstr(path.C_Str(), "spec"))
+                                map = M::Specular;
 
-                        // Specular
-                        else if (strstr(path.C_Str(), "spec"))
-                            map = M::Specular;
+                            // Emission
+                            else if (strstr(path.C_Str(), "emis"))
+                                map = M::Emission;
 
-                        // Emission
-                        else if (strstr(path.C_Str(), "emis"))
-                            map = M::Emission;
+                            // Reflection
+                            else if (strstr(path.C_Str(), "refl"))
+                                map = M::Reflection;
 
-                        // Reflection
-                        else if (strstr(path.C_Str(), "refl"))
-                            map = M::Reflection;
+                            // Opacity
+                            else if (strstr(path.C_Str(), "opa") || strstr(path.C_Str(), "alp"))
+                                map = M::Opacity;
 
-                        // Opacity
-                        else if (strstr(path.C_Str(), "opa") || strstr(path.C_Str(), "alp"))
-                            map = M::Opacity;
+                            // Gloss
+                            else if (strstr(path.C_Str(), "glo"))
+                                map = M::Gloss;
 
-                        // Gloss
-                        else if (strstr(path.C_Str(), "glo"))
-                            map = M::Gloss;
+                            // Not identified
+                            else
+                                continue;
 
-                        // Not identified
-                        else
-                            continue;
-
-                        joptexture.m_texturePath = getTexture(path.C_Str());
-                        joptexture.m_type = static_cast<int>(map);
-                        jopmaterial.m_textures.push_back(joptexture);
+                            joptexture.m_texStart = m_binaryWriter;
+                            joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                            joptexture.m_type = static_cast<int>(map);
+                            joptexture.m_texLength = m_binaryLastSize;
+                            m_textures[path.C_Str()] = joptexture;
+                            jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
+                        }
                     }
                 }
             }
@@ -572,7 +620,7 @@ namespace jopm
 
     void Converter::getMeshes(const aiScene* scene, Model& model)
     {
-        unsigned int totalSize = 0;
+        unsigned int totalSize = m_binaryWriter;
 
         for (size_t j = 0; j < scene->mNumMeshes; ++j)
         {
@@ -607,10 +655,18 @@ namespace jopm
                 {
                     auto& pos = mesh->mVertices[k];
                     reinterpret_cast<glm::vec3&>(jopmesh.m_vertexBuffer[vertIndex]) = glm::vec3(pos.x, pos.y, pos.z);
-                    m_localBB = std::make_pair(
-                        glm::vec3((std::min(m_localBB.first.x, pos.x), std::min(m_localBB.first.y, pos.y), std::min(m_localBB.first.z, pos.z))),
-                        glm::vec3((std::max(m_localBB.second.x, pos.x), std::max(m_localBB.second.y, pos.y), std::max(m_localBB.second.z, pos.z)))
+
+                    auto& bb = jopmesh.m_localBB;
+                    bb = std::make_pair(
+                        glm::vec3((std::min(bb.first.x, pos.x), std::min(bb.first.y, pos.y), std::min(bb.first.z, pos.z))),
+                        glm::vec3((std::max(bb.second.x, pos.x), std::max(bb.second.y, pos.y), std::max(bb.second.z, pos.z)))
                         );
+
+                    m_globalBB = std::make_pair(
+                        glm::vec3((std::min(m_globalBB.first.x, pos.x), std::min(m_globalBB.first.y, pos.y), std::min(m_globalBB.first.z, pos.z))),
+                        glm::vec3((std::max(m_globalBB.second.x, pos.x), std::max(m_globalBB.second.y, pos.y), std::max(m_globalBB.second.z, pos.z)))
+                        );
+
                     vertIndex += sizeof(glm::vec3);
                     meshSize += sizeof(glm::vec3);
                 }

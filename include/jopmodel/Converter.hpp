@@ -21,6 +21,7 @@
 
 #ifndef	JOPM_CONVERTER_HPP
 #define	JOPM_CONVERTER_HPP
+#define NOMINMAX
 
 //Headers
 #include <jopmodel/Material.hpp>
@@ -31,6 +32,7 @@
 #include <direct.h>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 #include <windows.h>
 
 #include <assimp/DefaultLogger.hpp>
@@ -116,7 +118,7 @@ namespace jopm
 
         bool makeNodes(aiNode& parentNode, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root);
 
-        bool binaryWriter(Model& model, const std::string& fileOut);
+        bool binaryWriter(const Model& model, const std::string& fileOut);
 
         bool jsonWriter(const aiScene& scene, Model& model, const std::string& fileOut);
 
@@ -124,7 +126,7 @@ namespace jopm
 
         void pushReflections(Material &jopmat, const aiColor3D& col, const int& refTypeIndex);
 
-        std::string getTexture(const std::string& texPath);
+        std::string getTexture(Material& jopmat, const std::string& texPath);
 
         std::string findTexture(const std::string& searchDir, const std::string& texName);
 
@@ -144,15 +146,19 @@ namespace jopm
         unsigned int m_impArgs = 0;
 
         unsigned int m_binaryWriter = 0;
+        unsigned int m_binaryLastSize = 0;
 
         bool m_embedTex = false;
         bool m_center = true;
 
         //1. minimum BB, 2. maximum BB
-        std::pair<glm::vec3, glm::vec3> m_localBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(FLT_MIN, FLT_MIN, FLT_MIN));
+        std::pair<glm::vec3, glm::vec3> m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(FLT_MIN, FLT_MIN, FLT_MIN));
 
         //1. absolute path to texture, 2. texture start (bytes), 3. texture size (bytes)
-        std::vector<std::tuple<std::string, unsigned int, unsigned int>> m_textureWithSize;
+        //std::vector<std::tuple<std::string, unsigned int, unsigned int>> m_textureWithSize;
+
+
+        std::unordered_map<std::string, Texture> m_textures;
 
     };
 }

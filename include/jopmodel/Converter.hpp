@@ -101,20 +101,20 @@ namespace jopm
         /// \brief Model converter
         ///
         /// This will convert a model file into jopmodel format
-        /// argv[1]: model file to convert
-        /// argv[2]: (Optional) path to the new model file
+        /// argv[1]:    model file to convert
+        /// argv[2]:    (Optional) path to the new model file
+        /// argv[1+]:   (Optional) Options to use during conversion
         ///
         /// \param argc Argc from main()
         /// \param argv Argv[] from main()
         ///
         static int conversion(const int argc, const char* argv[]);
 
-
     private:
         Converter();
         ~Converter();
 
-        bool processNode(aiNode& node, /*std::vector<Mesh>& meshes, std::vector<Material>& mats,*/ rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root, rapidjson::Value*& out);
+        bool processNode(aiNode& node, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root, rapidjson::Value*& out);
 
         bool makeNodes(aiNode& parentNode, std::vector<Mesh>& meshes, std::vector<Material>& mats, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& root);
 
@@ -137,7 +137,7 @@ namespace jopm
         bool sortArgs(const int& argc, const char* argv[]);
 
         void getMeshes(const aiScene* scene, Model& model);
-        
+
         //absolute path to texture (old position)
         std::string m_searchLoc = "";
         std::string m_modelName = "";
@@ -149,17 +149,13 @@ namespace jopm
         unsigned int m_binaryLastSize = 0;
 
         bool m_embedTex = false;
-        bool m_center = true;
+        bool m_centered = true;
+        float m_center[3] = {};
 
         //1. minimum BB, 2. maximum BB
-        std::pair<glm::vec3, glm::vec3> m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(FLT_MIN, FLT_MIN, FLT_MIN));
-
-        //1. absolute path to texture, 2. texture start (bytes), 3. texture size (bytes)
-        //std::vector<std::tuple<std::string, unsigned int, unsigned int>> m_textureWithSize;
-
+        std::pair<glm::vec3, glm::vec3> m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
 
         std::unordered_map<std::string, Texture> m_textures;
-
     };
 }
 #endif

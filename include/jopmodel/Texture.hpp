@@ -36,7 +36,6 @@ namespace jopm
 		~Texture();
 
 	private:
-
 		friend class Converter;
 
 		std::string m_texturePath;

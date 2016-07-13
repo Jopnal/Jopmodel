@@ -20,10 +20,7 @@
 //////////////////////////////////////////////
 
 //Headers
-
 #include <jopmodel/Converter.hpp>
-
-
 #include <Jopnal/Graphics/Material.hpp>
 #include <Jopnal/Graphics/Mesh.hpp>
 #include <Jopnal/Graphics/Texture.hpp>
@@ -55,7 +52,6 @@ namespace jopm
                     if (texFile.is_open())
                     {
                         writeFile << texFile.rdbuf();
-                        //writeFile.write(reinterpret_cast<const char*>(texFile.rdbuf()), std::get<2>(m_textureWithSize[i]) - std::get<1>(m_textureWithSize[i]));
                         texFile.clear();
                         texFile.close();
                     }
@@ -73,11 +69,11 @@ namespace jopm
         }
         else
             std::cout << "Failed to open file \"" << fileOut << "\" for reading" << std::endl;
-        printf("Writing binary failed\n");
+
         return false;
     }
 
-    bool Converter::processNode(aiNode& node, /*std::vector<Mesh>& meshes, std::vector<Material>& mats,*/ rapidjson::Value::AllocatorType& alloc, rapidjson::Value& rootChild, rapidjson::Value*& out)
+    bool Converter::processNode(aiNode& node, rapidjson::Value::AllocatorType& alloc, rapidjson::Value& rootChild, rapidjson::Value*& out)
     {
         namespace rj = rapidjson;
 
@@ -107,9 +103,9 @@ namespace jopm
             rotationArray.PushBack(rots.z, alloc);
 
             auto& positionArray = nodeObject.AddMember(rj::StringRef("position"), rj::kArrayType, alloc)["position"];
-            positionArray.PushBack(scale.x, alloc);
-            positionArray.PushBack(scale.y, alloc);
-            positionArray.PushBack(scale.z, alloc);
+            positionArray.PushBack(pos.x, alloc);
+            positionArray.PushBack(pos.y, alloc);
+            positionArray.PushBack(pos.z, alloc);
         }
 
         //mesh index
@@ -127,7 +123,7 @@ namespace jopm
     {
         rapidjson::Value* out = nullptr;
 
-        if (!processNode(parentNode,/* meshes, mats,*/ alloc, root, out))
+        if (!processNode(parentNode, alloc, root, out))
             return false;
 
         rapidjson::Value* rootChild = nullptr;
@@ -180,7 +176,6 @@ namespace jopm
         globalBBarray.PushBack(m_globalBB.second.y, modeldoc.GetAllocator());
         globalBBarray.PushBack(m_globalBB.second.z, modeldoc.GetAllocator());
 
-
         //MATERIALS
         auto& materialArray = modeldoc.AddMember(rj::StringRef("materials"), rj::kArrayType, modeldoc.GetAllocator())["materials"];
         for (auto& j : model.m_materials)
@@ -198,7 +193,6 @@ namespace jopm
 
             materialObject.AddMember(rj::StringRef("shininess"), j.m_shininess, modeldoc.GetAllocator());
             materialObject.AddMember(rj::StringRef("reflectivity"), j.m_reflectivity, modeldoc.GetAllocator());
-
 
             //TEXTUREARRAY IN MATERIAL
             auto& texturesArray = materialObject.AddMember(rj::StringRef("textures"), rj::kObjectType, modeldoc.GetAllocator())["textures"];
@@ -235,12 +229,10 @@ namespace jopm
             localBBarray.PushBack(i.m_localBB.second.x, modeldoc.GetAllocator());
             localBBarray.PushBack(i.m_localBB.second.y, modeldoc.GetAllocator());
             localBBarray.PushBack(i.m_localBB.second.z, modeldoc.GetAllocator());
-
         }
 
         scene.mRootNode->mName = "rootnode";
         makeNodes(*scene.mRootNode, model.m_meshes, model.m_materials, modeldoc.GetAllocator(), modeldoc);
-
 
         //write json to file
         std::ofstream file(fileOut, std::ofstream::trunc);
@@ -256,7 +248,7 @@ namespace jopm
             file.close();
             return true;
         }
-        printf("Writing json failed\n");
+        std::cout << "Writing json failed\n" << std::endl;
         return false;
     }
 
@@ -321,7 +313,6 @@ namespace jopm
                 if (m_embedTex)
                 {
                     //get the size to write
-                    //m_textureWithSize.emplace_back(m_modelName + '/' + textureName, m_binaryWriter, src.rdbuf()->pubseekoff(0, src.end));
                     unsigned int temp = m_binaryWriter;
                     m_binaryWriter += src.rdbuf()->pubseekoff(0, src.end);
                     m_binaryLastSize = m_binaryWriter - temp;
@@ -456,111 +447,83 @@ namespace jopm
                 }
             };
 
-            //mipmaps default to true
-
             //Types
             {
+                aiString path;
+                joptexture.m_texStart = m_binaryWriter;
+
                 // Diffuse
                 if (aiMat.GetTextureCount(aiTextureType_DIFFUSE))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_DIFFUSE, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
+                        
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         joptexture.m_srgb = true;
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
                 // Specular
                 if (aiMat.GetTextureCount(aiTextureType_SPECULAR))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_SPECULAR, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
                 // Gloss
                 if (aiMat.GetTextureCount(aiTextureType_SHININESS))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_SHININESS, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
                 // Emission
                 if (aiMat.GetTextureCount(aiTextureType_EMISSIVE))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_EMISSIVE, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         joptexture.m_srgb = true;
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
                 // Reflection
                 if (aiMat.GetTextureCount(aiTextureType_REFLECTION))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_REFLECTION, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
                 // Opacity
                 if (aiMat.GetTextureCount(aiTextureType_OPACITY))
                 {
-                    aiString path;
                     aiMat.GetTexture(aiTextureType_OPACITY, 0, &path);
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texStart = m_binaryWriter;
                         joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
-                        joptexture.m_texLength = m_binaryLastSize;
-                        m_textures[path.C_Str()] = joptexture;
-                        jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                     }
                 }
 
@@ -568,7 +531,6 @@ namespace jopm
                 {
                     for (std::size_t i = 0; i < aiMat.GetTextureCount(aiTextureType_UNKNOWN); ++i)
                     {
-                        aiString path;
                         aiMat.GetTexture(aiTextureType_UNKNOWN, i, &path);
                         if (path.length && !textureExists(m_textures, path.C_Str()))
                         {
@@ -604,15 +566,14 @@ namespace jopm
                             else
                                 continue;
 
-                            joptexture.m_texStart = m_binaryWriter;
                             joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
                             joptexture.m_type = static_cast<int>(map);
-                            joptexture.m_texLength = m_binaryLastSize;
-                            m_textures[path.C_Str()] = joptexture;
-                            jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
                         }
                     }
                 }
+                joptexture.m_texLength = m_binaryLastSize;
+                m_textures[path.C_Str()] = joptexture;
+                jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
             }
             model.m_materials.push_back(jopmaterial);
         }
@@ -632,17 +593,17 @@ namespace jopm
                 continue;
             }
 
-            //VERTICES
-            jopmesh.m_vertexBuffer.resize
-                (
-                (sizeof(glm::vec3) +
+            const unsigned int vertexSize = (sizeof(glm::vec3) +
                 sizeof(glm::vec2) * mesh->HasTextureCoords(0) +
                 sizeof(glm::vec3) * mesh->HasNormals() +
                 sizeof(glm::vec3) * mesh->HasTangentsAndBitangents() * 2 +
                 sizeof(jop::Color)     * mesh->HasVertexColors(0)
-                )
-                * mesh->mNumVertices
                 );
+
+            jopmesh.m_vertexSize = vertexSize;
+
+            //VERTICES
+            jopmesh.m_vertexBuffer.resize(vertexSize * mesh->mNumVertices);
 
             unsigned int meshSize = 0;
 
@@ -658,14 +619,15 @@ namespace jopm
 
                     auto& bb = jopmesh.m_localBB;
                     bb = std::make_pair(
-                        glm::vec3((std::min(bb.first.x, pos.x), std::min(bb.first.y, pos.y), std::min(bb.first.z, pos.z))),
-                        glm::vec3((std::max(bb.second.x, pos.x), std::max(bb.second.y, pos.y), std::max(bb.second.z, pos.z)))
+                        glm::vec3(std::min(bb.first.x, pos.x), std::min(bb.first.y, pos.y), std::min(bb.first.z, pos.z)),
+                        glm::vec3(std::max(bb.second.x, pos.x), std::max(bb.second.y, pos.y), std::max(bb.second.z, pos.z))
                         );
 
                     m_globalBB = std::make_pair(
-                        glm::vec3((std::min(m_globalBB.first.x, pos.x), std::min(m_globalBB.first.y, pos.y), std::min(m_globalBB.first.z, pos.z))),
-                        glm::vec3((std::max(m_globalBB.second.x, pos.x), std::max(m_globalBB.second.y, pos.y), std::max(m_globalBB.second.z, pos.z)))
+                        glm::vec3(std::min(m_globalBB.first.x, pos.x), std::min(m_globalBB.first.y, pos.y), std::min(m_globalBB.first.z, pos.z)),
+                        glm::vec3(std::max(m_globalBB.second.x, pos.x), std::max(m_globalBB.second.y, pos.y), std::max(m_globalBB.second.z, pos.z))
                         );
+
 
                     vertIndex += sizeof(glm::vec3);
                     meshSize += sizeof(glm::vec3);
@@ -770,6 +732,31 @@ namespace jopm
 
             model.m_meshes.push_back(jopmesh);
         }
+
+        //MODEL CENTERING
+        if (m_centered)
+        {
+            const glm::vec3 center(
+                0.5f * (m_globalBB.first.x + m_globalBB.second.x),
+                0.5f * (m_globalBB.first.y + m_globalBB.second.y),
+                0.5f * (m_globalBB.first.z + m_globalBB.second.z)
+                );
+
+            if (center == glm::vec3(0.f))
+                return;
+
+            for (auto& i : model.m_meshes)
+            {
+                for (int j = 0; j < i.m_vertexBuffer.size(); j += i.m_vertexSize)
+                {
+                    reinterpret_cast<glm::vec3&>(i.m_vertexBuffer[j]) -= center;
+                }
+                i.m_localBB.first -= center;
+                i.m_localBB.second -= center;
+            }
+            m_globalBB.first -= center;
+            m_globalBB.second -= center;
+        }
     }
 
     std::string Converter::sortPaths(const int& argc, const char* argv[])
@@ -777,7 +764,7 @@ namespace jopm
         std::string searchLoc = argv[1];
         std::string modelName = argv[1];
         std::string fileOutPath;
-        std::string temproot;
+        std::string tempRoot;
 
         int lastFolder = -1;
         int lastDot = -1;
@@ -794,14 +781,14 @@ namespace jopm
 
             pathBuffer.resize(copied);
 
-            temproot = std::string(pathBuffer.begin(), pathBuffer.end());
+            tempRoot = std::string(pathBuffer.begin(), pathBuffer.end());
 
-            for (size_t i = 0; i < temproot.size(); ++i)
+            for (size_t i = 0; i < tempRoot.size(); ++i)
             {
-                if (temproot[i] == '/' || temproot[i] == '\\' || temproot[i] == './' || temproot[i] == '.\\')
+                if (tempRoot[i] == '/' || tempRoot[i] == '\\' || tempRoot[i] == './' || tempRoot[i] == '.\\')
                     lastFolder = i;
             }
-            temproot.resize(lastFolder);
+            tempRoot.resize(lastFolder);
         }
         //~execution path
 
@@ -823,7 +810,7 @@ namespace jopm
             //given argv[1] doesn't seem to be a file
             if (lastDot == -1)
             {
-                printf("Unknown parameters: second argument is not a file\n"); //fix so that * can be used
+                std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
                 return "";
             }
 
@@ -835,13 +822,13 @@ namespace jopm
             //A directory structure was given but it doesn't start from root --- konv stuff/model.jop
             if (fromRoot == false)
             {
-                searchLoc = temproot + '\\' + searchLoc;
+                searchLoc = tempRoot + '\\' + searchLoc;
             }
 
             //no directory structure was given, starting from working directory --- konv model.jop
             if (lastFolder == -1)
             {
-                searchLoc = temproot;
+                searchLoc = tempRoot;
             }
 
             m_searchLoc = searchLoc;
@@ -853,7 +840,6 @@ namespace jopm
             if (argc > 2)
             {
                 fileOutPath = argv[2];
-
                 lastDot = -1;
                 fromRoot = false;
 
@@ -875,10 +861,9 @@ namespace jopm
                 //  stuff/model1 || model1
                 if (fromRoot == false)
                 {
-                    fileOutPath = temproot + '\\' + fileOutPath;
+                    fileOutPath = tempRoot + '\\' + fileOutPath;
                 }
             }
-
             else
             {
                 fileOutPath = searchLoc;
@@ -898,30 +883,33 @@ namespace jopm
                 tempPath = fileOutPath;
             }
         }
-        _mkdir((fileOutPath + m_modelName).c_str());
+        if (!m_embedTex)
+            _mkdir((fileOutPath + m_modelName).c_str());
         m_outputDir = fileOutPath + m_modelName;
-
         return m_outputDir + ".jop";
     }
 
     bool Converter::sortArgs(const int& argc, const char* argv[])
     {
-        if (argv[1] == "-h" || argv[1] == "/h" || argv[1] == "-help" || argv[1] == "/help")
+        if (!std::strcmp(argv[1], "-h") || !std::strcmp(argv[1], "/h") || !std::strcmp(argv[1], "-help") || !std::strcmp(argv[1], "/help"))
         {
             std::cout <<
-                "Jopmodel converter\n"
-                "Use this tool to convert your model files to be compatible with the Jopnal engine\n"
-                "See more in Jopnal.net\n"
-                "Arguments:\n\n"
-                "Required:\n"
+                "\nJOPMODEL CONVERTER\n"
+                "Use this tool to convert your model files to be compatible with the Jopnal engine.\n"
+                "See more in \"Jopnal.net\" and \"github.com/Jopnal\"\n\n"
+                "ARGUMENTS:\n\n"
+                "REQUIRED:\n"
                 "First argument: file to load\n\n"
-                "Optional:\n"
-                "Second argument: path to write new model\n"
-                "-ET - embed textures into the model file, default off\n"
-                "-OG - optimize graph, default on\n"
-                "-C - calculate local center for Jopnal engine, default on\n"
+                "OPTIONAL:\n"
+                
+                "Second argument: path to write the new model file.\nWrites a file same name as the original model, ending in \".jop\".\n"
+                "Creates required directories.\n"
+                "If not specified, creates the file in to the same directory as the original model.\n\n"
+                
+                "-et : --embed-textures = embed textures into the model file, default off\n\n"
+                "-cn : --no-collapse    = collapse nodes, default on\n\n"
+                "-cc : --no-center      = calculate local center of the object for Jopnal engine, default on\n"
                 << std::endl;
-
             return false;
         }
 
@@ -933,29 +921,28 @@ namespace jopm
         };
 
         int i = 2;
-        if (std::string(argv[2]).find(':'))
-            i = 3;
+            if (std::string(argv[1]).find(':'))
+                i = 3;
 
-        for (i; i < argc; ++i)
+        for (; i < argc; ++i)
         {
             auto& a = std::string(argv[i]);
             auto& ac = argCalls;
 
             for (int j = 0; j < ac.size(); ++j)
             {
-                if (!a.compare(ac[j] + "C") || !a.compare(ac[j] + "c") || !a.compare(ac[j] + "no-center")) //case sensitive?
-                    m_center = false;
-
-                else if (!a.compare(ac[j] + "ET") || !a.compare(ac[j] + "et") || !a.compare(ac[j] + "embed-textures"))
+                if (!a.compare(ac[j] + "ET") || !a.compare(ac[j] + "et") || !a.compare(ac[j] + "embed-textures"))
                     m_embedTex = true;
 
-                else if (!a.compare(ac[j] + "OG") || !a.compare(ac[j] + "og") || !a.compare(ac[j] + "no-optimize"))
+                else if (!a.compare(ac[j] + "CN") || !a.compare(ac[j] + "cn") || !a.compare(ac[j] + "no-collapse"))
                     flags.push_back(aiProcess_OptimizeGraph);
+
+                else if (!a.compare(ac[j] + "CC") || !a.compare(ac[j] + "cc") || !a.compare(ac[j] + "no-center"))
+                    m_centered = false;
             }
         }
 
         std::vector<unsigned int> impArgs = {
-
             aiProcess_CalcTangentSpace,
             aiProcess_JoinIdenticalVertices,
             aiProcess_OptimizeGraph,
@@ -990,7 +977,6 @@ namespace jopm
     {
         if (argc > 1)
         {
-
             //Terminal
             HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
             {
@@ -1012,17 +998,16 @@ namespace jopm
             //~Terminal
 
             Converter conv;
-            std::vector<unsigned int> args;
 
-            if (argc > 1)
-                if (!conv.sortArgs(argc, argv))
-                    return false;
+            if (!conv.sortArgs(argc, argv))
+                return false;
 
             std::string pathIn = argv[1];
             std::string fileOut = conv.sortPaths(argc, argv);
+            if (fileOut.empty() || std::strcmp(fileOut.c_str(), ".jop"))
+                return false;
 
             //Setup Assimp
-            //TODO: argv[] options for flags
             Assimp::DefaultLogger::set(new detail::Logger);
             Assimp::Importer imp;
             unsigned int comps = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
@@ -1031,29 +1016,33 @@ namespace jopm
 
             //read old model file with assimp
             std::cout << "Loading model..." << std::endl;
-
-
             const aiScene *scene = imp.ReadFile(pathIn, conv.m_impArgs);
-            if (!scene) {
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_RED);
+            if (!scene)
+            {
+                SetConsoleTextAttribute(consoleHandle, 4);
                 std::cout << "Unable to load mesh: " << imp.GetErrorString() << std::endl;
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
+                SetConsoleTextAttribute(consoleHandle, 7);
                 Assimp::DefaultLogger::kill();
                 return false;
             }
+
+            SetConsoleTextAttribute(consoleHandle, 7);
             Assimp::DefaultLogger::kill();
-            SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED);
             Model model;
 
             conv.getMaterials(scene, model);
             conv.getMeshes(scene, model);
+
             if (conv.jsonWriter(*scene, model, fileOut) && conv.binaryWriter(model, fileOut))
             {
                 std::cout << "Model converted successfully\n" << std::endl;
                 return true;
             }
             std::cout << "Model conversion failed\n" << std::endl;
+            return false;
         }
+        else
+            std::cout << "Expected an argument, type \"konv -help\" to see instructions." << std::endl;
         return false;
     }
 }

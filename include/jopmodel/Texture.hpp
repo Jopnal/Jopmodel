@@ -31,20 +31,20 @@ namespace jopm
 {
 	class Texture
 	{
-	public:
-		Texture();
-		~Texture();
-
-	private:
 		friend class Converter;
 
+    public:
+        Texture();
+        ~Texture();
+
+    private:
 		std::string m_texturePath;
-		int m_type = 0; //diffuse, specular etc.
-		int m_wrapmode = 0; //repeat, clamp etc.
-        bool m_srgb = false;
-        bool m_genmipmaps = true;
-        unsigned int m_texStart = 0;
-        unsigned int m_texLength = 0;
+		unsigned int m_type; //diffuse, specular etc.
+		unsigned int m_wrapmode; //repeat, clamp etc.
+        unsigned int m_texStart;
+        unsigned int m_texLength;
+        bool m_srgb;
+        bool m_genmipmaps;
     };
 }
 #endif

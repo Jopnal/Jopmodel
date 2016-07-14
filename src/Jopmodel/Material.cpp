@@ -26,12 +26,26 @@
 
 namespace jopm
 {
-	Material::Material()
-	{
-	}
+    Material::Material() :
+        m_reflections   (),
+        m_shininess     (1.f),
+        m_reflectivity  (0.f),
+        m_keypairs      ()
+    {
+        for (int i = 0; i < sizeof(m_reflections) / sizeof(m_reflections[0]); ++i)
+        {
+            m_reflections[i] = 0.f;
+        }
+    }
+    Material::~Material()
+    {
+    }
 
-
-	Material::~Material()
-	{
-	}
+    void Material::pushReflections(Material &jopmat, const aiColor3D& col, const int& refTypeIndex)
+    {
+        jopmat.m_reflections[refTypeIndex * 4 + 0] = col.r;
+        jopmat.m_reflections[refTypeIndex * 4 + 1] = col.g;
+        jopmat.m_reflections[refTypeIndex * 4 + 2] = col.b;
+        jopmat.m_reflections[refTypeIndex * 4 + 3] = 1.0;
+    }
 }

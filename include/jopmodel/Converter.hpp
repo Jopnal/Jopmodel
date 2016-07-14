@@ -55,8 +55,6 @@ namespace jopm
 {
     namespace detail
     {
-        HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-
         struct Logger : Assimp::Logger
         {
             Logger()
@@ -73,22 +71,22 @@ namespace jopm
             }
             void OnDebug(const char* message) override
             {
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_GREEN);
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_BLUE | FOREGROUND_GREEN);
                 std::cout << "DEBUG: " << message << std::endl;
             }
             void OnInfo(const char* message) override
             {
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_BLUE | FOREGROUND_RED);
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_BLUE | FOREGROUND_RED);
                 std::cout << "INFO: " << message << std::endl;
             }
             void OnWarn(const char* message) override
             {
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_RED | FOREGROUND_GREEN);
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED | FOREGROUND_GREEN);
                 std::cout << "WARNING: " << message << std::endl;
             }
             void OnError(const char* message) override
             {
-                SetConsoleTextAttribute(consoleHandle, FOREGROUND_RED);
+                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
                 std::cout << "ERROR: " << message << std::endl;
             }
         };
@@ -111,6 +109,7 @@ namespace jopm
         static int conversion(const int argc, const char* argv[]);
 
     private:
+
         Converter();
         ~Converter();
 
@@ -123,8 +122,6 @@ namespace jopm
         bool jsonWriter(const aiScene& scene, Model& model, const std::string& fileOut);
 
         bool binaryReader(std::string fileOut);
-
-        void pushReflections(Material &jopmat, const aiColor3D& col, const int& refTypeIndex);
 
         std::string getTexture(Material& jopmat, const std::string& texPath);
 
@@ -139,22 +136,20 @@ namespace jopm
         void getMeshes(const aiScene* scene, Model& model);
 
         //absolute path to texture (old position)
-        std::string m_searchLoc = "";
-        std::string m_modelName = "";
-        std::string m_outputDir = "";
-        std::string m_textureName = "";
-        unsigned int m_impArgs = 0;
+        std::string m_searchLoc;
+        std::string m_modelName;
+        std::string m_outputDir;
+        std::string m_textureName;
+        unsigned int m_impArgs;
+        unsigned int m_binaryWriter;
+        unsigned int m_binaryLastSize;
+        bool m_embedTex;
+        bool m_centered;
 
-        unsigned int m_binaryWriter = 0;
-        unsigned int m_binaryLastSize = 0;
-
-        bool m_embedTex = false;
-        bool m_centered = true;
-        float m_center[3] = {};
-
+        
         //1. minimum BB, 2. maximum BB
-        std::pair<glm::vec3, glm::vec3> m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
-
+        std::pair<glm::vec3, glm::vec3> m_globalBB;
+        std::vector<std::string> m_argCalls;
         std::unordered_map<std::string, Texture> m_textures;
     };
 }

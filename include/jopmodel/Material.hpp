@@ -23,6 +23,7 @@
 #define JOPM_MATERIAL_HPP
 
 //Headers
+#include <assimp/Importer.hpp>
 #include <cstdint>
 #include <vector>
 
@@ -32,18 +33,18 @@ namespace jopm
 {
 	class Material
 	{
-	public:
-		Material();
-		~Material();
-	private:
-
-		friend class Converter;
-
-		float m_reflections[16];
-		float m_shininess = 1.0f;
-		float m_reflectivity = 0.0f;
-
+        friend class Converter;
+    
+    public:
+        Material();
+        ~Material();
+	
+        float m_reflections[16];
+        float m_shininess;
+        float m_reflectivity;
         std::vector<std::pair<std::string, unsigned int>> m_keypairs;
+
+        void pushReflections(Material &jopmat, const aiColor3D& col, const int& refTypeIndex);
 	};
 }
 #endif

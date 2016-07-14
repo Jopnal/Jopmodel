@@ -31,31 +31,29 @@
 
 namespace jopm
 {
-	class Mesh
-	{
-	public:
-		Mesh();
-		~Mesh();
+    class Mesh
+    {
+        friend class Converter;
 
-	private:
-		friend class Converter;
+    public:
+        Mesh();
+        ~Mesh();
 
-		std::vector<unsigned char> m_vertexBuffer;
-		std::vector<unsigned char> m_indexBuffer;
-		uint32_t m_vertexComponents;
+    private:
+        uint32_t m_vertexComponents;
+        uint32_t m_matIndex;
+        unsigned int m_type; //triangles, lines etc.
+        uint32_t m_components; //bitfield
+        unsigned int m_meshStart;
+        unsigned int m_meshLength; //bytes
+        unsigned int m_meshStartIndex;
+        unsigned int m_meshLengthIndex;
+        unsigned int m_meshSizeIndex;
+        unsigned int m_vertexSize;
 
-		uint32_t m_matIndex;
-		int m_type; //triangles, lines etc.
-		uint32_t m_components = 0; //bitfield
-
-		unsigned int m_meshStartIndex = 0;
-		unsigned int m_meshStart = 0;
-		unsigned int m_meshLengthIndex = 0;
-		unsigned int m_meshLength = 0; //bytes
-        unsigned int m_meshSizeIndex = 0;
-        unsigned int m_vertexSize = 0;
-
-        std::pair<glm::vec3, glm::vec3> m_localBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
-	};
+        std::vector<unsigned char> m_vertexBuffer;
+        std::vector<unsigned char> m_indexBuffer;
+        std::pair<glm::vec3, glm::vec3> m_localBB;
+    };
 }
 #endif

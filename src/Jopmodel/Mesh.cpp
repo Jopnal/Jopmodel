@@ -26,12 +26,25 @@
 
 namespace jopm
 {
-	Mesh::Mesh()
-	{
-	}
+    Mesh::Mesh() :
+        m_vertexComponents  (0),
+        m_matIndex          (0),
+        m_type              (0),
+        m_components        (0),
+        m_meshStart         (0),
+        m_meshLength        (0),
+        m_meshStartIndex    (0),
+        m_meshLengthIndex   (0),
+        m_meshSizeIndex     (0),
+        m_vertexSize        (0),
+        m_vertexBuffer      (),
+        m_indexBuffer       (),
+        m_localBB           ()
+    {
+        m_localBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
+    }
 
-
-	Mesh::~Mesh()
-	{
-	}
+    Mesh::~Mesh()
+    {
+    }
 }

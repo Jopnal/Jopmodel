@@ -34,11 +34,11 @@ namespace jopm
 	class Model
 	{
 		friend class Converter;
-	public:
-		Model();
-		~Model();
 
 	private:
+        Model();
+        ~Model();
+
 		std::vector<Material> m_materials;
 		std::vector<Mesh> m_meshes;
 	};

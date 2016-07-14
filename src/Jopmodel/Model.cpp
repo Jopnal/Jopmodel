@@ -26,12 +26,13 @@
 
 namespace jopm
 {
-	Model::Model()
-	{
-	}
+    Model::Model() :
+        m_materials (),
+        m_meshes    ()
+    {
+    }
 
-
-	Model::~Model()
-	{
-	}
+    Model::~Model()
+    {
+    }
 }

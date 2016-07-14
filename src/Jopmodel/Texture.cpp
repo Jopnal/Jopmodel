@@ -26,12 +26,18 @@
 
 namespace jopm
 {
-	Texture::Texture()
-	{
-	}
+    Texture::Texture() :
+        m_texturePath   (),
+        m_type          (0),
+        m_wrapmode      (0),
+        m_texStart      (0),
+        m_texLength     (0),
+        m_srgb          (false),
+        m_genmipmaps    (true)
+    {
+    }
 
-
-	Texture::~Texture()
-	{
-	}
+    Texture::~Texture()
+    {
+    }
 }

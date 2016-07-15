@@ -9,6 +9,10 @@ Jopmodel converter has been tested to work on these operating systems:
 
 The project, as of now, only contains the project files for Visual Studio 2013.
 
+1. Clone
+2. Use CMake to build the source
+3. Use VS2013 to compile the project
+4. Use the application via command line
 
 
 ### Documentation

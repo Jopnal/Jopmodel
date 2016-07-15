@@ -824,7 +824,7 @@ namespace jopm
             if (lastDot == -1)
             {
                 std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
-                return ".jop";
+                return ".jopm";
             }
 
             modelName = modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //name of the model == folder name to create
@@ -832,13 +832,13 @@ namespace jopm
             //Cut the model file out
             searchLoc.resize(lastFolder);
 
-            //A directory structure was given but it doesn't start from root --- konv stuff/model.jop
+            //A directory structure was given but it doesn't start from root --- konv stuff/model.jopm
             if (fromRoot == false)
             {
                 searchLoc = tempRoot + '\\' + searchLoc;
             }
 
-            //no directory structure was given, starting from working directory --- konv model.jop
+            //no directory structure was given, starting from working directory --- konv model.jopm
             if (lastFolder == -1)
             {
                 searchLoc = tempRoot;
@@ -918,7 +918,7 @@ namespace jopm
             _mkdir((fileOutPath + modelName).c_str());
         m_outputDir = fileOutPath + modelName;
         m_modelName = modelName;
-        return m_outputDir + ".jop";
+        return m_outputDir + ".jopm";
     }
 
     bool Converter::sortArgs(const int& argc, const char* argv[])
@@ -934,7 +934,7 @@ namespace jopm
                 "First argument: file to load\n\n"
                 "OPTIONAL:\n"
 
-                "Second argument: path to write the new model file.\nWrites a file same name as the original model, ending in \".jop\".\n"
+                "Second argument: path to write the new model file.\nWrites a file same name as the original model, ending in \".jopm\".\n"
                 "Creates required directories.\n"
                 "If not specified, creates the file in to the same directory as the original model.\n\n"
 
@@ -1032,7 +1032,7 @@ namespace jopm
 
             std::string pathIn = argv[1];
             std::string fileOut = conv.sortPaths(argc, argv);
-            if (!std::strcmp(fileOut.c_str(), ".jop"))
+            if (!std::strcmp(fileOut.c_str(), ".jopm"))
                 return false;
 
             //Setup Assimp

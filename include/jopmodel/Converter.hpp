@@ -29,6 +29,7 @@
 #include <jopmodel/Model.hpp>
 #include <jopmodel/Texture.hpp>
 
+#include <cctype>
 #include <direct.h>
 #include <fstream>
 #include <iostream>
@@ -110,6 +111,15 @@ namespace jopm
 
     private:
 
+        struct pathInfo
+        {
+            std::string anyPath = "";
+            bool fromRoot = false;
+            int lastDot = -1;
+            int lastFolder = -1;
+        };
+
+
         Converter();
         ~Converter();
 
@@ -131,7 +141,11 @@ namespace jopm
 
         std::string sortPaths(const int& argc, const char* argv[]);
 
+        pathInfo sortAPath(const std::string& anyPath);
+
         bool sortArgs(const int& argc, const char* argv[]);
+
+        bool argComp(std::string& a, std::string& b);
 
         void getMeshes(const aiScene* scene, Model& model);
 
@@ -145,6 +159,8 @@ namespace jopm
         unsigned int m_binaryLastSize;
         bool m_embedTex;
         bool m_centered;
+        bool m_argvNewPath;
+        bool m_verbose;
 
         
         //1. minimum BB, 2. maximum BB

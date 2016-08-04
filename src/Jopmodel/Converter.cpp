@@ -30,18 +30,20 @@
 namespace jopm
 {
     Converter::Converter() :
-        m_searchLoc         (),
-        m_modelName         (),
-        m_outputDir         (),
-        m_textureName       (),
-        m_impArgs           (0),
-        m_binaryWriter      (0),
-        m_binaryLastSize    (0),
-        m_embedTex          (false),
-        m_centered          (true),
-        m_globalBB          (),
-        m_argCalls          (),
-        m_textures          ()
+        m_searchLoc(),
+        m_modelName(),
+        m_outputDir(),
+        m_textureName(),
+        m_impArgs(0),
+        m_binaryWriter(0),
+        m_binaryLastSize(0),
+        m_embedTex(false),
+        m_centered(true),
+        m_globalBB(),
+        m_argCalls(),
+        m_textures(),
+        m_argvNewPath(false),
+        m_verbose(false)
     {
         m_argCalls = { "-", "/", "--" };
         m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
@@ -337,7 +339,7 @@ namespace jopm
             }
             else
             {
-                std::cout << "Failed to find texture: " << textureName << std::endl;
+                std::cout << "Failed to find texture: " << textureName << " from " << m_searchLoc << std::endl;
             }
         }
         m_textureName = textureName;
@@ -772,16 +774,29 @@ namespace jopm
         }
     }
 
+    Converter::pathInfo Converter::sortAPath(const std::string& anyPath)
+    {
+        pathInfo newInfo;
+
+        for (size_t i = 0; i < anyPath.size(); ++i)
+        {
+            if (anyPath[i] == '/' || anyPath[i] == '\\' || anyPath[i] == './' || anyPath[i] == '.\\')
+                newInfo.lastFolder = i;
+            else if (anyPath[i] == '.')
+                newInfo.lastDot = i;
+            else if (anyPath[i] == ':')
+                newInfo.fromRoot = true;
+        }
+        return newInfo;
+    }
+
     std::string Converter::sortPaths(const int& argc, const char* argv[])
     {
         std::string searchLoc = argv[1];
         std::string modelName = argv[1];
-        std::string fileOutPath;
-        std::string tempRoot;
+        std::string fileOutPath; //can't initialize yet
 
-        int lastFolder = -1;
-        int lastDot = -1;
-        bool fromRoot = false;
+        std::string tempRoot;
 
         //execution path
         {
@@ -793,116 +808,82 @@ namespace jopm
             } while (copied >= pathBuffer.size());
 
             pathBuffer.resize(copied);
-
             tempRoot = std::string(pathBuffer.begin(), pathBuffer.end());
+            pathInfo info = sortAPath(tempRoot);
 
-            for (size_t i = 0; i < tempRoot.size(); ++i)
-            {
-                if (tempRoot[i] == '/' || tempRoot[i] == '\\' || tempRoot[i] == './' || tempRoot[i] == '.\\')
-                    lastFolder = i;
-            }
-            tempRoot.resize(lastFolder);
+            tempRoot.resize(info.lastFolder);
+
+            if (m_verbose)
+                std::cout << "Root path after execution path block is: " << tempRoot << std::endl;
         }
         //~execution path
 
         //argv[1]
         {
             //find out what kind of path we are given
-            lastFolder = -1; //reset
-
-            for (size_t i = 0; i < searchLoc.size(); ++i)
-            {
-                if (searchLoc[i] == '/' || searchLoc[i] == '\\' || searchLoc[i] == './' || searchLoc[i] == '.\\')
-                    lastFolder = i;
-                else if (searchLoc[i] == '.')
-                    lastDot = i;
-                else if (searchLoc[i] == ':')
-                    fromRoot = true;
-            }
+            pathInfo info = sortAPath(searchLoc);
 
             //given argv[1] doesn't seem to be a file
-            if (lastDot == -1)
+            if (info.lastDot == -1)
             {
                 std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
                 return ".jopm";
             }
 
-            modelName = modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //name of the model == folder name to create
+            modelName = modelName.substr(info.lastFolder + 1, info.lastDot - (info.lastFolder + 1)); //name of the model == folder name to create
 
             //Cut the model file out
-            searchLoc.resize(lastFolder);
+            searchLoc.resize(info.lastFolder == -1 ? 0 : info.lastFolder);
 
             //A directory structure was given but it doesn't start from root --- konv stuff/model.jopm
-            if (fromRoot == false)
-            {
+            if (info.fromRoot == false)
                 searchLoc = tempRoot + '\\' + searchLoc;
-            }
 
             //no directory structure was given, starting from working directory --- konv model.jopm
-            if (lastFolder == -1)
-            {
+            if (info.lastFolder == -1)
                 searchLoc = tempRoot;
-            }
 
             m_searchLoc = searchLoc;
+
+            if (m_verbose)
+            {
+                std::cout << "Model name after argv[1] block is: " << modelName << std::endl;
+                std::cout << "Search location after argv[1] block is: " << searchLoc << std::endl;
+            }
         }
         //~argv[1]
 
         //argv[2]
         {
-            if (argc > 2)
+            if (m_argvNewPath)
             {
+                //find out what kind of path we are given
                 fileOutPath = argv[2];
-                lastDot = -1;
-                fromRoot = false;
+                pathInfo info = sortAPath(fileOutPath);
 
-                auto& a = std::string(argv[2]);
-                auto& ac = m_argCalls;
-                bool skip = false;
+                //It's going to be a .jopm!
+                if (info.lastDot != -1)
+                    fileOutPath.resize(info.lastDot);
 
-                for (unsigned int i = 0; i < ac.size(); ++i)
-                {
-                    if (!a.compare(ac[i] + "ET") || !a.compare(ac[i] + "et") || !a.compare(ac[i] + "embed-textures"))
-                        skip = true;
-
-                    else if (!a.compare(ac[i] + "CN") || !a.compare(ac[i] + "cn") || !a.compare(ac[i] + "no-collapse"))
-                        skip = true;
-
-                    else if (!a.compare(ac[i] + "CC") || !a.compare(ac[i] + "cc") || !a.compare(ac[i] + "no-center"))
-                        skip = true;
-                }
-                if (!skip)
-                {
-                    //find out what kind of path we are given
-                    for (size_t i = 0; i < fileOutPath.size(); ++i)
-                    {
-                        if (fileOutPath[i] == '.')
-                            lastDot = i;
-                        else if (fileOutPath[i] == ':')
-                            fromRoot = true;
-                    }
-
-                    //  C:/Program Files/.../model.txt || models/model.jpg
-                    if (lastDot != -1)
-                    {
-                        fileOutPath.resize(lastDot);
-                    }
-
-                    //  stuff/model1 || model1
-                    if (fromRoot == false)
-                    {
-                        fileOutPath = tempRoot + '\\' + fileOutPath;
-                    }
-                }
+                if (info.fromRoot == false)
+                    fileOutPath = tempRoot + '\\' + fileOutPath;
             }
+
             else
-            {
                 fileOutPath = searchLoc;
+
+            if (m_verbose)
+            {
+                std::string isNewPath = m_argvNewPath ? "true" : "false";
+                std::cout << "There is a new location to place the converted model: " << isNewPath << std::endl;
+                std::cout << "FileOutPath after argv[2] block is: " << fileOutPath << std::endl;
             }
+
         }
         //~argv[2]
 
         //Create directory tree
+        //////////////////////////////////////////////////Should redesign this
         fileOutPath += '\\';
         std::string tempPath = fileOutPath;
         for (size_t i = 0; i < fileOutPath.size(); ++i)
@@ -914,6 +895,7 @@ namespace jopm
                 tempPath = fileOutPath;
             }
         }
+        //Create a directory if not embedded, should check whether there are files to copy
         if (!m_embedTex)
             _mkdir((fileOutPath + modelName).c_str());
         m_outputDir = fileOutPath + modelName;
@@ -947,27 +929,43 @@ namespace jopm
 
         std::vector<unsigned int> flags;
 
-
-        int i = 2;
-        if (std::string(argv[1]).find(':'))
-            i = 3;
-
-        for (; i < argc; ++i)
+        for (unsigned int i = 0; i < argc; ++i)
         {
             auto& a = std::string(argv[i]);
             auto& ac = m_argCalls;
 
             for (unsigned int j = 0; j < ac.size(); ++j)
             {
-                if (!a.compare(ac[j] + "ET") || !a.compare(ac[j] + "et") || !a.compare(ac[j] + "embed-textures"))
+                if (argComp(a, ac[j] + "et") || argComp(a, ac[j] + "embed-textures"))
                     m_embedTex = true;
-
-                else if (!a.compare(ac[j] + "CN") || !a.compare(ac[j] + "cn") || !a.compare(ac[j] + "no-collapse"))
+                else if (argComp(a, ac[j] + "cn") || argComp(a, ac[j] + "no-collapse"))
                     flags.push_back(aiProcess_OptimizeGraph);
-
-                else if (!a.compare(ac[j] + "CC") || !a.compare(ac[j] + "cc") || !a.compare(ac[j] + "no-center"))
+                else if (argComp(a, ac[j] + "cc") || argComp(a, ac[j] + "no-center"))
                     m_centered = false;
+                else if (argComp(a, ac[j] + "v") || argComp(a, ac[j] + "verbose"))
+                    m_verbose = true;
+                else if (i == 2u)
+                {
+                    std::cout << argv[i] << " triggered newPath" << std::endl;
+                    std::string cen = m_centered ? "true" : "false";
+                    std::cout << cen << std::endl;
+                    m_argvNewPath = true;
+                }
+                    
             }
+        }
+
+        if (m_verbose)
+        {
+            std::string emb = m_embedTex ? "true" : "false";
+            std::string cln = flags.back() == aiProcess_OptimizeGraph ? "true" : "false";
+            std::string cen = m_centered ? "true" : "false";
+
+            std::cout << "Using verbose mode.\n" <<
+                "Embedded textures: " << emb <<
+                "Collapsed nodes: " << cln <<
+                "Centered model: " << cen <<
+                std::endl;
         }
 
         std::vector<unsigned int> impArgs = {
@@ -999,6 +997,15 @@ namespace jopm
             m_impArgs |= i;
 
         return true;
+    }
+
+    bool Converter::argComp(std::string& a, std::string& b)
+    {
+        if (a.length() == b.length())
+        {
+            return std::equal(b.begin(), b.end(), a.begin(), [](unsigned char _a, unsigned char _b){return std::tolower(_a) == std::tolower(_b); });
+        }
+        return false;
     }
 
     int Converter::conversion(const int argc, const char* argv[])
@@ -1036,7 +1043,8 @@ namespace jopm
                 return false;
 
             //Setup Assimp
-            Assimp::DefaultLogger::set(new detail::Logger);
+            if (conv.m_verbose)
+                Assimp::DefaultLogger::set(new detail::Logger);
             Assimp::Importer imp;
             unsigned int comps = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
             imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, comps);
@@ -1050,12 +1058,14 @@ namespace jopm
                 SetConsoleTextAttribute(consoleHandle, 4);
                 std::cout << "Unable to load mesh: " << imp.GetErrorString() << std::endl;
                 SetConsoleTextAttribute(consoleHandle, 7);
-                Assimp::DefaultLogger::kill();
+                if (conv.m_verbose)
+                    Assimp::DefaultLogger::kill();
                 return false;
             }
 
             SetConsoleTextAttribute(consoleHandle, 7);
-            Assimp::DefaultLogger::kill();
+            if (conv.m_verbose)
+                Assimp::DefaultLogger::kill();
             Model model;
 
             conv.getMaterials(scene, model);

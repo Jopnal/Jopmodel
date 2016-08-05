@@ -24,24 +24,22 @@
 #define NOMINMAX
 
 //Headers
+#include <jopmodel/FileSystem.hpp>
 #include <jopmodel/Material.hpp>
 #include <jopmodel/Mesh.hpp>
 #include <jopmodel/Model.hpp>
 #include <jopmodel/Texture.hpp>
 
-#include <cctype>
-#include <direct.h>
+//#include <direct.h>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
-#include <windows.h>
+//#include <windows.h>
 
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
-
-#include <dirent/dirent.h>
 
 #include <glm/glm.hpp>
 
@@ -111,15 +109,6 @@ namespace jopm
 
     private:
 
-        struct pathInfo
-        {
-            std::string anyPath = "";
-            bool fromRoot = false;
-            int lastDot = -1;
-            int lastFolder = -1;
-        };
-
-
         Converter();
         ~Converter();
 
@@ -133,39 +122,21 @@ namespace jopm
 
         bool binaryReader(std::string fileOut);
 
-        std::string getTexture(Material& jopmat, const std::string& texPath);
-
-        std::string findTexture(const std::string& searchDir, const std::string& texName);
-
-        void getMaterials(const aiScene* scene, Model& model);
-
-        std::string sortPaths(const int& argc, const char* argv[]);
-
-        pathInfo sortAPath(const std::string& anyPath);
-
-        bool sortArgs(const int& argc, const char* argv[]);
-
-        bool argComp(std::string& a, std::string& b);
+        void getMaterials(const aiScene* scene, Model& model, FileSystem& fs);
 
         void getMeshes(const aiScene* scene, Model& model);
+
+        unsigned int processAssimpArgs(const FileSystem& fs);
 
         //absolute path to texture (old position)
         std::string m_searchLoc;
         std::string m_modelName;
-        std::string m_outputDir;
-        std::string m_textureName;
-        unsigned int m_impArgs;
-        unsigned int m_binaryWriter;
-        unsigned int m_binaryLastSize;
+        
         bool m_embedTex;
         bool m_centered;
-        bool m_argvNewPath;
-        bool m_verbose;
 
-        
         //1. minimum BB, 2. maximum BB
         std::pair<glm::vec3, glm::vec3> m_globalBB;
-        std::vector<std::string> m_argCalls;
         std::unordered_map<std::string, Texture> m_textures;
     };
 }

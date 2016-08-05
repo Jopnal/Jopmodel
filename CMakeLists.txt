@@ -12,12 +12,14 @@ add_executable(jopmodel
 ${SRCDIR}/main.cpp
 
 ${SRCDIR}/Converter.cpp
+${SRCDIR}/FileSystem.cpp
 ${SRCDIR}/Material.cpp
 ${SRCDIR}/Mesh.cpp
 ${SRCDIR}/Model.cpp
 ${SRCDIR}/Texture.cpp
 
 ${INCDIR}/Converter.hpp
+${INCDIR}/FileSystem.hpp
 ${INCDIR}/Material.hpp
 ${INCDIR}/Mesh.hpp
 ${INCDIR}/Model.hpp

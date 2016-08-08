@@ -112,9 +112,9 @@ namespace jopm
             {
                 m_parTexSearchLoc = searchLoc;
                 std::string t_tempRoot = tempRoot;
-                std::string::size_type i = t_tempRoot.find_last_of(searchLoc);
+                std::string::size_type i = t_tempRoot.find(searchLoc);
                 if (i != std::string::npos)
-                    t_tempRoot.erase(i + 1, searchLoc.length());
+                    t_tempRoot.erase(i, searchLoc.length());
                 searchLoc = t_tempRoot;
             }
 
@@ -148,20 +148,25 @@ namespace jopm
                 if (info.lastDot > 0) //should work with ./directory
                     fileOutPath.resize(info.lastDot);
 
-                if (info.fromRoot == false && info.lastFolder != -1)
+                if (info.fromRoot == false)
                 {
                     std::string t_fileOutPath = tempRoot;
-                    std::string::size_type i = t_fileOutPath.find(m_parTexSearchLoc);
+                    std::string::size_type i;
+
+                    //Keep separate!
+                    if (m_parTexSearchLoc.empty())
+                        i = std::string::npos;
+                    else
+                        i = t_fileOutPath.find(m_parTexSearchLoc);
+
                     if (i != std::string::npos)
+                    {
                         t_fileOutPath.erase(i, m_parTexSearchLoc.length());
-                    fileOutPath = t_fileOutPath + fileOutPath;
+                        fileOutPath = t_fileOutPath + fileOutPath;
+                    }
+                    else
+                        fileOutPath = tempRoot + '\\' + fileOutPath;
                 }
-
-                if (info.fromRoot == false && info.lastFolder == -1)
-                {
-                    //same folder call goes to upper & messy name
-                }
-
             }
 
             else

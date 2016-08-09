@@ -25,6 +25,7 @@
 //Headers
 #include <dirent/dirent.h>
 
+#include <cassert>
 #include <cctype>
 #include <direct.h>
 #include <fstream>
@@ -45,7 +46,6 @@ namespace jopm
 
         struct pathInfo
         {
-            std::string anyPath = "";
             bool fromRoot = false;
             int lastDot = -1;
             int lastFolder = -1;
@@ -53,31 +53,36 @@ namespace jopm
 
         FileSystem();
 
-        std::string sortPaths(const int& argc, const char* argv[]);
-
-        pathInfo sortAPath(const std::string& anyPath);
-
         bool sortArgs(const int& argc, const char* argv[]);
 
         bool argComp(std::string& a, std::string& b);
 
+        std::string sortPaths(const int& argc, const char* argv[]);
+
+        pathInfo sortAPath(const std::string& anyPath);
+
         std::string findTexture(const std::string& searchDir, const std::string& texName);
 
-        std::string getTexture(const std::string& texPath);
+        std::pair<std::string, std::string> getTexture(const std::string& texPath);
+
+        bool makeDirs(const std::string& dirsToMake);
 
         bool m_embedTex;
         bool m_verbose;
         bool m_argvNewPath;
         bool m_optimizeGraph;
         bool m_centered;
+        bool m_firstTex;
         
         std::string m_absTexSearchLoc;
         std::string m_parTexSearchLoc;
         std::string m_modelName;
         std::string m_absOutputPath;
 
-        static std::vector<std::string> m_argCalls;
+        unsigned int m_binaryWriter;
+        unsigned int m_binaryLastSize;
 
+        const static std::vector<std::string> m_argCalls;
     };
 }
 #endif

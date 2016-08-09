@@ -29,16 +29,15 @@
 
 namespace jopm
 {
-    unsigned int g_binaryWriter = 0u;
-    unsigned int g_binaryLastSize = 0u;
-
     Converter::Converter() :
-        m_searchLoc(),
+        m_outPath(),
         m_modelName(),
         m_embedTex(false),
         m_centered(true),
         m_globalBB(),
-        m_textures()
+        m_textures(),
+        m_binaryWriter(0u),
+        m_binaryLastSize(0u)
     {
         m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
     }
@@ -56,11 +55,11 @@ namespace jopm
             {
                 for (auto& i : m_textures)
                 {
-                    if (!i.second.m_texturePath.empty())
+                    if (!i.second.m_texturePaths.first.empty())
                     {
-                        i.second.m_texturePath.erase(i.second.m_texturePath.begin(), i.second.m_texturePath.begin() + i.second.m_texturePath.find_last_of('/') + 1);
+                        //i.second.m_texturePath.erase(i.second.m_texturePath.begin(), i.second.m_texturePath.begin() + i.second.m_texturePath.find_last_of('/') + 1);
 
-                        std::ifstream texFile(m_searchLoc + '\\' + i.second.m_texturePath, std::ios::binary | std::ios::in);
+                        std::ifstream texFile(i.second.m_texturePaths.first, std::ios::binary | std::ios::in);
                         if (texFile.is_open())
                         {
                             writeFile << texFile.rdbuf();
@@ -68,7 +67,7 @@ namespace jopm
                             texFile.close();
                         }
                         else
-                            std::cout << "Failed to open file \"" << i.second.m_texturePath << "\" for reading" << std::endl;
+                            std::cout << "Failed to open file \"" << i.second.m_texturePaths.first << "\" for reading" << std::endl;
                     }
                 }
             }
@@ -164,7 +163,7 @@ namespace jopm
         auto& texArray = modeldoc.AddMember(rj::StringRef("textures"), rj::kObjectType, modeldoc.GetAllocator())["textures"];
         for (auto& j : m_textures)
         {
-            auto& texObject = texArray.AddMember(rj::StringRef(j.second.m_texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[j.second.m_texturePath.c_str()];
+            auto& texObject = texArray.AddMember(rj::StringRef(j.second.m_texturePaths.second.c_str()), rj::kObjectType, modeldoc.GetAllocator())[j.second.m_texturePaths.second.c_str()];
 
             if (m_embedTex)
             {
@@ -172,10 +171,8 @@ namespace jopm
                 texObject.AddMember(rj::StringRef("length"), j.second.m_texLength, modeldoc.GetAllocator());
             }
             else
-            {
-                //std::string temp = j.first.substr(j.first.find_last_of('/') + 1, j.first.size())
                 texObject.AddMember(rj::StringRef("path"), rj::Value((m_modelName + '/' + j.first.substr(j.first.find_last_of('/') + 1, j.first.size())).c_str(), modeldoc.GetAllocator()), modeldoc.GetAllocator());
-            }
+
             texObject.AddMember(rj::StringRef("wrapmode"), j.second.m_wrapmode, modeldoc.GetAllocator());
             texObject.AddMember(rj::StringRef("srgb"), j.second.m_srgb, modeldoc.GetAllocator());
             texObject.AddMember(rj::StringRef("genmipmaps"), j.second.m_genmipmaps, modeldoc.GetAllocator());
@@ -341,7 +338,7 @@ namespace jopm
             //Types
             {
                 aiString path;
-                joptexture.m_texStart = g_binaryWriter;
+                joptexture.m_texStart = m_binaryWriter;
 
                 // Diffuse
                 if (aiMat.GetTextureCount(aiTextureType_DIFFUSE))
@@ -351,7 +348,7 @@ namespace jopm
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
 
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         joptexture.m_srgb = true;
                     }
@@ -364,7 +361,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
                     }
                 }
@@ -376,7 +373,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
                     }
                 }
@@ -388,7 +385,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         joptexture.m_srgb = true;
                     }
@@ -401,7 +398,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
                     }
                 }
@@ -413,7 +410,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
                     }
                 }
@@ -457,16 +454,16 @@ namespace jopm
                             else
                                 continue;
 
-                            joptexture.m_texturePath = fs.getTexture(path.C_Str());
+                            joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                             joptexture.m_type = static_cast<int>(map);
                         }
                     }
                 }
-                joptexture.m_texLength = g_binaryLastSize;
-                if (!joptexture.m_texturePath.empty() && std::strcmp(path.C_Str(), ""))
+                joptexture.m_texLength = m_binaryLastSize;
+                if (!joptexture.m_texturePaths.second.empty() && std::strcmp(path.C_Str(), ""))
                 {
                     m_textures[path.C_Str()] = joptexture;
-                    jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
+                    jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePaths.second, joptexture.m_type);
                 }
             }
             model.m_materials.push_back(jopmaterial);
@@ -475,7 +472,7 @@ namespace jopm
 
     void Converter::getMeshes(const aiScene* scene, Model& model)
     {
-        unsigned int totalSize = g_binaryWriter;
+        unsigned int totalSize = m_binaryWriter;
 
         for (size_t j = 0; j < scene->mNumMeshes; ++j)
         {
@@ -676,6 +673,16 @@ namespace jopm
         return t_impArgs;
     }
 
+    void Converter::getValuesFS(const FileSystem& fs)
+    {
+        m_binaryLastSize = fs.m_binaryLastSize;
+        m_binaryWriter = fs.m_binaryWriter;
+        m_modelName = fs.m_modelName;
+        m_outPath = fs.m_absOutputPath;
+        m_centered = fs.m_centered;
+        m_embedTex = fs.m_embedTex;
+    }
+
     int Converter::conversion(const int argc, const char* argv[])
     {
         if (argc > 1)
@@ -710,9 +717,7 @@ namespace jopm
                 return false;
 
             std::string absFile(fs.m_absOutputPath + ".jopm");
-            conv.m_modelName = fs.m_modelName;
-            conv.m_searchLoc = fs.m_absOutputPath;
-
+            conv.getValuesFS(fs);
 
             //Setup Assimp
             if (fs.m_verbose)
@@ -742,6 +747,7 @@ namespace jopm
 
             conv.getMaterials(scene, model, fs);
             conv.getMeshes(scene, model);
+            conv.getValuesFS(fs);
 
             if (fs.m_verbose)
                 std::cout << "json and binary will be written to: " << absFile << std::endl;

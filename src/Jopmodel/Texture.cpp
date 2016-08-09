@@ -27,7 +27,7 @@
 namespace jopm
 {
     Texture::Texture() :
-        m_texturePath   (),
+        m_texturePaths   (),
         m_type          (0),
         m_wrapmode      (0),
         m_texStart      (0),

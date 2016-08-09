@@ -26,189 +26,24 @@
 
 namespace jopm
 {
-    //Global forward declarations
-    extern unsigned int g_binaryWriter;
-    extern unsigned int g_binaryLastSize;
-
-    //Static definitions
-    std::vector<std::string> FileSystem::m_argCalls = { "-", "/", "--" };
+    //Static definition
+    const std::vector<std::string> FileSystem::m_argCalls = { "-", "/", "--" };
 
 
     FileSystem::FileSystem() :
-        m_absOutputPath(),
-        m_absTexSearchLoc(),
-        m_argvNewPath(),
-        m_centered(false),
-        m_embedTex(false),
-        m_modelName(),
-        m_optimizeGraph(false),
-        m_parTexSearchLoc(),
-        m_verbose(false)
+        m_embedTex          (false),
+        m_verbose           (false),
+        m_argvNewPath       (false),
+        m_optimizeGraph     (false),
+        m_centered          (false),
+        m_firstTex          (true),
+        m_absTexSearchLoc   (),
+        m_parTexSearchLoc   (),
+        m_modelName         (),
+        m_absOutputPath     (),
+        m_binaryWriter      (0u),
+        m_binaryLastSize    (0u)
     {}
-
-    FileSystem::pathInfo FileSystem::sortAPath(const std::string& anyPath)
-    {
-        pathInfo newInfo;
-
-        for (size_t i = 0; i < anyPath.size(); ++i)
-        {
-            if (anyPath[i] == '/' || anyPath[i] == '\\' || anyPath[i] == './' || anyPath[i] == '.\\')
-                newInfo.lastFolder = i;
-            else if (anyPath[i] == '.')
-                newInfo.lastDot = i;
-            else if (anyPath[i] == ':')
-                newInfo.fromRoot = true;
-        }
-        return newInfo;
-    }
-
-    std::string FileSystem::sortPaths(const int& argc, const char* argv[])
-    {
-        std::string searchLoc = argv[1];
-        std::string modelName = argv[1];
-        std::string fileOutPath; //don't initialize yet
-
-        std::string tempRoot;
-
-        //execution path
-        {
-            std::vector<wchar_t> pathBuffer;
-            DWORD copied = 0;
-            do {
-                pathBuffer.resize(pathBuffer.size() + MAX_PATH);
-                copied = GetModuleFileNameW(0, &pathBuffer.at(0), pathBuffer.size());
-            } while (copied >= pathBuffer.size());
-
-            pathBuffer.resize(copied);
-            tempRoot = std::string(pathBuffer.begin(), pathBuffer.end());
-            pathInfo info = sortAPath(tempRoot);
-
-            tempRoot.resize(info.lastFolder);
-
-            if (m_verbose)
-                std::cout << "Root path after execution path block is: " << tempRoot << std::endl;
-        }
-        //~execution path
-
-        //argv[1]
-        {
-            //find out what kind of path we are given
-            pathInfo info = sortAPath(searchLoc);
-
-            //given argv[1] doesn't seem to be a file
-            if (info.lastDot == -1)
-            {
-                std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
-                return ".jopm";
-            }
-
-            modelName = modelName.substr(info.lastFolder + 1, info.lastDot - (info.lastFolder + 1)); //name of the model == folder name to create
-
-            //Cut the model file out
-            searchLoc.resize(info.lastFolder == -1 ? 0 : info.lastFolder);
-
-            //A directory structure was given but it doesn't start from root
-            if (info.fromRoot == false)
-            {
-                m_parTexSearchLoc = searchLoc;
-                std::string t_tempRoot = tempRoot;
-                std::string::size_type i = t_tempRoot.find(searchLoc);
-                if (i != std::string::npos)
-                    t_tempRoot.erase(i, searchLoc.length());
-                searchLoc = t_tempRoot;
-            }
-
-
-            //no directory structure was given, starting from working directory
-            if (info.lastFolder == -1)
-                searchLoc = tempRoot;
-
-            if (info.fromRoot == true)
-                m_parTexSearchLoc = searchLoc;
-
-            m_absTexSearchLoc = searchLoc;
-
-            if (m_verbose)
-            {
-                std::cout << "Model name after argv[1] block is: " << modelName << std::endl;
-                std::cout << "Search location after argv[1] block is: " << searchLoc << std::endl;
-            }
-        }
-        //~argv[1]
-
-        //argv[2]
-        {
-            if (m_argvNewPath)
-            {
-                //find out what kind of path we are given
-                fileOutPath = argv[2];
-                pathInfo info = sortAPath(fileOutPath);
-
-                //It's going to be a .jopm!
-                if (info.lastDot > 0) //should work with ./directory
-                    fileOutPath.resize(info.lastDot);
-
-                if (info.fromRoot == false)
-                {
-                    std::string t_fileOutPath = tempRoot;
-                    std::string::size_type i;
-
-                    //Keep separate!
-                    if (m_parTexSearchLoc.empty())
-                        i = std::string::npos;
-                    else
-                        i = t_fileOutPath.find(m_parTexSearchLoc);
-
-                    if (i != std::string::npos)
-                    {
-                        t_fileOutPath.erase(i, m_parTexSearchLoc.length());
-                        fileOutPath = t_fileOutPath + fileOutPath;
-                    }
-                    else
-                        fileOutPath = tempRoot + '\\' + fileOutPath;
-                }
-            }
-
-            else
-                fileOutPath = searchLoc;
-
-            if (m_verbose)
-            {
-                std::string isNewPath = m_argvNewPath ? "true" : "false";
-                std::cout << "There is a new location to place the converted model: " << isNewPath << std::endl;
-                std::cout << "FileOutPath after argv[2] block is: " << fileOutPath << std::endl;
-            }
-
-        }
-        //~argv[2]
-
-        //Create directory tree
-        //////////////////////////////////////////////////Should redesign this
-        fileOutPath += '\\';
-        std::string tempPath = fileOutPath;
-        for (size_t i = 0; i < fileOutPath.size(); ++i)
-        {
-            if (fileOutPath[i] == '\\')
-            {
-                tempPath.resize(i);
-                if (m_verbose)
-                    std::cout << "Creating the following directory: " << tempPath << std::endl;
-                _mkdir(tempPath.c_str());
-                tempPath = fileOutPath;
-            }
-        }
-        //Create a directory if not embedded
-        //////////////////////////////////////should check whether there are files to copy and create it only if there are
-        if (!m_embedTex)
-        {
-            _mkdir((fileOutPath + modelName).c_str());
-            if (m_verbose)
-                std::cout << "Creating the following directory: " << (fileOutPath + modelName) << std::endl;
-        }
-        m_absOutputPath = fileOutPath + modelName;
-        m_modelName = modelName;
-        return m_absOutputPath + ".jopm";
-    }
 
     bool FileSystem::sortArgs(const int& argc, const char* argv[])
     {
@@ -235,7 +70,7 @@ namespace jopm
         }
 
         std::string triggeredPath;
-        for (unsigned int i = 0; i < argc; ++i)
+        for (int i = 0; i < argc; ++i)
         {
             auto& a = std::string(argv[i]);
             auto& ac = m_argCalls;
@@ -297,6 +132,144 @@ namespace jopm
         return false;
     }
 
+    std::string FileSystem::sortPaths(const int& argc, const char* argv[])
+    {
+        std::string searchLoc = argv[1];
+        std::string modelName = argv[1];
+        std::string fileOutPath; //don't initialize yet
+        std::string tempRoot;
+
+        //execution path
+        {
+            std::vector<wchar_t> pathBuffer;
+            DWORD copied = 0;
+            do {
+                pathBuffer.resize(pathBuffer.size() + MAX_PATH);
+                copied = GetModuleFileNameW(0, &pathBuffer.at(0), pathBuffer.size());
+            } while (copied >= pathBuffer.size());
+
+            pathBuffer.resize(copied);
+            tempRoot = std::string(pathBuffer.begin(), pathBuffer.end());
+            pathInfo info = sortAPath(tempRoot);
+
+            tempRoot.resize(info.lastFolder);
+
+            if (m_verbose)
+                std::cout << "Root path after execution path block is: " << tempRoot << std::endl;
+        }
+        //~execution path
+
+        //argv[1]
+        {
+            //find out what kind of path we are given
+            pathInfo info = sortAPath(searchLoc);
+
+            //given argv[1] doesn't seem to be a file
+            if (info.lastDot == -1)
+            {
+                std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
+                return ".jopm";
+            }
+
+            modelName = modelName.substr(info.lastFolder + 1, info.lastDot - (info.lastFolder + 1)); //name of the model == folder name to create
+
+            //Cut the model file out
+            searchLoc.resize(info.lastFolder == -1 ? 0 : info.lastFolder);
+
+            //A directory structure was given but it doesn't start from root
+            if (info.fromRoot == false)
+            {
+                m_parTexSearchLoc = searchLoc;
+                std::string t_tempRoot = tempRoot;
+                std::string::size_type i = t_tempRoot.find(searchLoc);
+                if (i != std::string::npos)
+                    t_tempRoot.erase(i, searchLoc.length());
+                searchLoc = t_tempRoot;
+            }
+
+            //no directory structure was given, starting from working directory
+            if (info.lastFolder == -1)
+                searchLoc = tempRoot;
+
+            if (info.fromRoot == true)
+                m_parTexSearchLoc = searchLoc;
+
+            m_absTexSearchLoc = searchLoc;
+
+            if (m_verbose)
+            {
+                std::cout << "Model name after argv[1] block is: " << modelName << std::endl;
+                std::cout << "Search location after argv[1] block is: " << searchLoc << std::endl;
+            }
+        }
+        //~argv[1]
+
+        //argv[2]
+        {
+            if (m_argvNewPath)
+            {
+                //find out what kind of path we are given
+                fileOutPath = argv[2];
+                pathInfo info = sortAPath(fileOutPath);
+
+                //It's going to be a .jopm!
+                if (info.lastDot > 0) //should work with ./directory
+                    fileOutPath.resize(info.lastDot);
+
+                if (info.fromRoot == false)
+                {
+                    std::string t_fileOutPath = tempRoot;
+                    std::string::size_type i;
+
+                    //Keep these 4 separate!
+                    if (m_parTexSearchLoc.empty())
+                        i = std::string::npos;
+                    else
+                        i = t_fileOutPath.find(m_parTexSearchLoc);
+
+                    if (i != std::string::npos)
+                    {
+                        t_fileOutPath.erase(i, m_parTexSearchLoc.length());
+                        fileOutPath = t_fileOutPath + fileOutPath;
+                    }
+                    else
+                        fileOutPath = tempRoot + '\\' + fileOutPath;
+                }
+            }
+
+            else
+                fileOutPath = searchLoc;
+
+            if (m_verbose)
+            {
+                std::string isNewPath = m_argvNewPath ? "true" : "false";
+                std::cout << "There is a new location to place the converted model: " << isNewPath << std::endl;
+                std::cout << "FileOutPath after argv[2] block is: " << fileOutPath << std::endl;
+            }
+        }
+        //~argv[2]
+
+        m_absOutputPath = fileOutPath + '\\' + modelName;
+        m_modelName = modelName;
+        return m_absOutputPath + ".jopm";
+    }
+
+    FileSystem::pathInfo FileSystem::sortAPath(const std::string& anyPath)
+    {
+        pathInfo newInfo;
+
+        for (size_t i = 0; i < anyPath.size(); ++i)
+        {
+            if (anyPath[i] == '/' || anyPath[i] == '\\' || anyPath[i] == './' || anyPath[i] == '.\\')
+                newInfo.lastFolder = i;
+            else if (anyPath[i] == '.')
+                newInfo.lastDot = i;
+            else if (anyPath[i] == ':')
+                newInfo.fromRoot = true;
+        }
+        return newInfo;
+    }
+
     std::string FileSystem::findTexture(const std::string& searchDir, const std::string& texName)
     {
         DIR *dir;
@@ -337,49 +310,37 @@ namespace jopm
         return "";
     }
 
-    std::string FileSystem::getTexture(const std::string& texPath)
+    std::pair<std::string, std::string> FileSystem::getTexture(const std::string& texPath)
     {
+        if (m_firstTex)
+        {
+            //Create directory tree
+            if (!makeDirs(m_absOutputPath))
+            {
+                std::cout << "Can not place files next to the original model. Check file paths and priviledges." << std::endl;
+                assert(false);
+            }
+            m_firstTex = false;
+        }
+
         std::string texLoc;
         std::string textureName = texPath;
-        int texFolder = -1;
-        bool foundTex = false;
+        bool texAlreadyMoved = false;
 
         //get the name of the texture resource
-        for (size_t i = 0; i < texPath.size(); ++i)
-        {
-            if (texPath[i] == '/' || texPath[i] == '\\' || texPath[i] == './' || texPath[i] == '.\\')
-                texFolder = i;
-        }
-        textureName = textureName.substr(texFolder + 1, textureName.size());
+        pathInfo info = sortAPath(texPath);
+        textureName = textureName.substr(info.lastFolder + 1, texPath.size());
 
         //no need to go in here when embedding
         if (!m_embedTex)
         {
-            //Check quickly if there is already a correct folder...
-            DIR *dir;
-            struct dirent *ent;
-            if ((dir = opendir(m_absOutputPath.c_str())) != NULL)
-            {
-                //...and does it have the correct file...
-                while ((ent = readdir(dir)) != NULL)
-                {
-                    if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..")
-                    {
-                        if (ent->d_type == DT_UNKNOWN || ent->d_type == DT_REG)
-                        {
-                            if (std::string(ent->d_name) == textureName)
-                            {
-                                //texture found
-                                foundTex = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            //Check if the texture has already been moved...
+            texLoc = findTexture(m_absOutputPath, textureName);
+            if (!texLoc.empty())
+                texAlreadyMoved = true;
         }
         //...if not, go find the texture location
-        if (!foundTex)
+        if (!texAlreadyMoved)
         {
             //The Search
             texLoc = findTexture(m_absTexSearchLoc, textureName);
@@ -390,9 +351,9 @@ namespace jopm
                 if (m_embedTex)
                 {
                     //get the size to write
-                    unsigned int temp = g_binaryWriter;
-                    g_binaryWriter += static_cast<unsigned int>(src.rdbuf()->pubseekoff(0, src.end));
-                    g_binaryLastSize = g_binaryWriter - temp;
+                    unsigned int temp = m_binaryWriter;
+                    m_binaryWriter += static_cast<unsigned int>(src.rdbuf()->pubseekoff(0, src.end));
+                    m_binaryLastSize = m_binaryWriter - temp;
                 }
                 else
                 {
@@ -403,13 +364,57 @@ namespace jopm
                 src.close();
             }
             else
-            {
                 std::cout << "Failed to find texture: " << textureName << " from " << m_absTexSearchLoc << std::endl;
-            }
         }
         //m_textureName = textureName;
-        //Changing the path to be compatible with the Jopnal engine
-        return m_modelName + '/' + textureName;
+        //Changing the path to be compatible with the Jopnal Engine
+        return std::make_pair(texLoc, m_modelName + '/' + textureName);
     }
 
+    bool FileSystem::makeDirs(const std::string& dirsToMake)
+    {
+        std::string outDir = dirsToMake;
+        pathInfo info = sortAPath(outDir);
+
+        if (m_embedTex)
+            outDir.resize(info.lastFolder);
+
+        outDir += '\\';
+
+        std::string tempPath = outDir;
+        for (size_t i = 0; i < outDir.size(); ++i)
+        {
+            if (outDir[i] == '\\')
+            {
+                tempPath.resize(i);
+
+                //Reset error.
+                _set_errno(0);
+                //Can create only one directory at a time.
+                int result = _mkdir(tempPath.c_str());
+
+                if (result != 0 && errno == ENOENT)
+                {
+                    std::cout << "Can not create directory: " << tempPath << "\nPlacing files next to the original model: " << m_absTexSearchLoc << std::endl;
+                    if (!argComp(m_absOutputPath, m_absTexSearchLoc))
+                    {
+                        //Keep!
+                        m_absOutputPath = m_absTexSearchLoc;
+                        return makeDirs(m_absOutputPath);
+                    }
+                }
+
+                if (m_verbose)
+                {
+                    if (errno == EEXIST)
+                        std::cout << "Directory exists: " << tempPath << std::endl;
+
+                    if (result == 0)
+                        std::cout << "Created directory: " << tempPath << std::endl;
+                }
+                tempPath = outDir;
+            }
+        }
+        return true;
+    }
 }

@@ -128,12 +128,16 @@ namespace jopm
 
         unsigned int processAssimpArgs(const FileSystem& fs);
 
-        //absolute path to texture (old position)
-        std::string m_searchLoc;
+        void getValuesFS(const FileSystem& fs);
+
+        std::string m_outPath;
         std::string m_modelName;
         
         bool m_embedTex;
         bool m_centered;
+
+        unsigned int m_binaryWriter;
+        unsigned int m_binaryLastSize;
 
         //1. minimum BB, 2. maximum BB
         std::pair<glm::vec3, glm::vec3> m_globalBB;

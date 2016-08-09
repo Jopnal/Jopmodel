@@ -24,23 +24,22 @@
 #define NOMINMAX
 
 //Headers
+#include <jopmodel/FileSystem.hpp>
 #include <jopmodel/Material.hpp>
 #include <jopmodel/Mesh.hpp>
 #include <jopmodel/Model.hpp>
 #include <jopmodel/Texture.hpp>
 
-#include <direct.h>
+//#include <direct.h>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
-#include <windows.h>
+//#include <windows.h>
 
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
-
-#include <dirent/dirent.h>
 
 #include <glm/glm.hpp>
 
@@ -123,33 +122,25 @@ namespace jopm
 
         bool binaryReader(std::string fileOut);
 
-        std::string getTexture(Material& jopmat, const std::string& texPath);
-
-        std::string findTexture(const std::string& searchDir, const std::string& texName);
-
-        void getMaterials(const aiScene* scene, Model& model);
-
-        std::string sortPaths(const int& argc, const char* argv[]);
-
-        bool sortArgs(const int& argc, const char* argv[]);
+        void getMaterials(const aiScene* scene, Model& model, FileSystem& fs);
 
         void getMeshes(const aiScene* scene, Model& model);
 
-        //absolute path to texture (old position)
-        std::string m_searchLoc;
+        unsigned int processAssimpArgs(const FileSystem& fs);
+
+        void getValuesFS(const FileSystem& fs);
+
+        std::string m_outPath;
         std::string m_modelName;
-        std::string m_outputDir;
-        std::string m_textureName;
-        unsigned int m_impArgs;
-        unsigned int m_binaryWriter;
-        unsigned int m_binaryLastSize;
+        
         bool m_embedTex;
         bool m_centered;
 
-        
+        unsigned int m_binaryWriter;
+        unsigned int m_binaryLastSize;
+
         //1. minimum BB, 2. maximum BB
         std::pair<glm::vec3, glm::vec3> m_globalBB;
-        std::vector<std::string> m_argCalls;
         std::unordered_map<std::string, Texture> m_textures;
     };
 }

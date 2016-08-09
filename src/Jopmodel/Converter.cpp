@@ -30,20 +30,15 @@
 namespace jopm
 {
     Converter::Converter() :
-        m_searchLoc         (),
-        m_modelName         (),
-        m_outputDir         (),
-        m_textureName       (),
-        m_impArgs           (0),
-        m_binaryWriter      (0),
-        m_binaryLastSize    (0),
-        m_embedTex          (false),
-        m_centered          (true),
-        m_globalBB          (),
-        m_argCalls          (),
-        m_textures          ()
+        m_outPath(),
+        m_modelName(),
+        m_embedTex(false),
+        m_centered(true),
+        m_globalBB(),
+        m_textures(),
+        m_binaryWriter(0u),
+        m_binaryLastSize(0u)
     {
-        m_argCalls = { "-", "/", "--" };
         m_globalBB = std::make_pair(glm::vec3(FLT_MAX, FLT_MAX, FLT_MAX), glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX));
     }
 
@@ -60,11 +55,11 @@ namespace jopm
             {
                 for (auto& i : m_textures)
                 {
-                    if (!i.second.m_texturePath.empty())
+                    if (!i.second.m_texturePaths.first.empty())
                     {
-                        i.second.m_texturePath.erase(i.second.m_texturePath.begin(), i.second.m_texturePath.begin() + i.second.m_texturePath.find_last_of('/') + 1);
+                        //i.second.m_texturePath.erase(i.second.m_texturePath.begin(), i.second.m_texturePath.begin() + i.second.m_texturePath.find_last_of('/') + 1);
 
-                        std::ifstream texFile(m_searchLoc + '\\' + i.second.m_texturePath, std::ios::binary | std::ios::in);
+                        std::ifstream texFile(i.second.m_texturePaths.first, std::ios::binary | std::ios::in);
                         if (texFile.is_open())
                         {
                             writeFile << texFile.rdbuf();
@@ -72,7 +67,7 @@ namespace jopm
                             texFile.close();
                         }
                         else
-                            std::cout << "Failed to open file \"" << i.second.m_texturePath << "\" for reading" << std::endl;
+                            std::cout << "Failed to open file \"" << i.second.m_texturePaths.first << "\" for reading" << std::endl;
                     }
                 }
             }
@@ -168,7 +163,7 @@ namespace jopm
         auto& texArray = modeldoc.AddMember(rj::StringRef("textures"), rj::kObjectType, modeldoc.GetAllocator())["textures"];
         for (auto& j : m_textures)
         {
-            auto& texObject = texArray.AddMember(rj::StringRef(j.second.m_texturePath.c_str()), rj::kObjectType, modeldoc.GetAllocator())[j.second.m_texturePath.c_str()];
+            auto& texObject = texArray.AddMember(rj::StringRef(j.second.m_texturePaths.second.c_str()), rj::kObjectType, modeldoc.GetAllocator())[j.second.m_texturePaths.second.c_str()];
 
             if (m_embedTex)
             {
@@ -176,10 +171,8 @@ namespace jopm
                 texObject.AddMember(rj::StringRef("length"), j.second.m_texLength, modeldoc.GetAllocator());
             }
             else
-            {
-                //std::string temp = j.first.substr(j.first.find_last_of('/') + 1, j.first.size())
                 texObject.AddMember(rj::StringRef("path"), rj::Value((m_modelName + '/' + j.first.substr(j.first.find_last_of('/') + 1, j.first.size())).c_str(), modeldoc.GetAllocator()), modeldoc.GetAllocator());
-            }
+
             texObject.AddMember(rj::StringRef("wrapmode"), j.second.m_wrapmode, modeldoc.GetAllocator());
             texObject.AddMember(rj::StringRef("srgb"), j.second.m_srgb, modeldoc.GetAllocator());
             texObject.AddMember(rj::StringRef("genmipmaps"), j.second.m_genmipmaps, modeldoc.GetAllocator());
@@ -270,122 +263,7 @@ namespace jopm
         return false;
     }
 
-    std::string Converter::getTexture(Material& jopmat, const std::string& texPath)
-    {
-        std::string texLoc;
-        std::string textureName = texPath;
-        int texFolder = -1;
-        bool foundTex = false;
-
-        //get the name of the texture resource
-        for (size_t i = 0; i < texPath.size(); ++i)
-        {
-            if (texPath[i] == '/' || texPath[i] == '\\' || texPath[i] == './' || texPath[i] == '.\\')
-                texFolder = i;
-        }
-        textureName = textureName.substr(texFolder + 1, textureName.size());
-
-        //no need to go in here when embedding
-        if (!m_embedTex)
-        {
-            //Check quickly if there is already a correct folder...
-            DIR *dir;
-            struct dirent *ent;
-            if ((dir = opendir(m_outputDir.c_str())) != NULL)
-            {
-                //...and does it have the correct file...
-                while ((ent = readdir(dir)) != NULL)
-                {
-                    if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..")
-                    {
-                        if (ent->d_type == DT_UNKNOWN || ent->d_type == DT_REG)
-                        {
-                            if (std::string(ent->d_name) == textureName)
-                            {
-                                //texture found
-                                foundTex = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        //...if not, go find the texture location
-        if (!foundTex)
-        {
-            //The Search
-            texLoc = findTexture(m_searchLoc, textureName);
-
-            if (!texLoc.empty())
-            {
-                std::ifstream src(texLoc, std::ios::binary);
-                if (m_embedTex)
-                {
-                    //get the size to write
-                    unsigned int temp = m_binaryWriter;
-                    m_binaryWriter += static_cast<unsigned int>(src.rdbuf()->pubseekoff(0, src.end));
-                    m_binaryLastSize = m_binaryWriter - temp;
-                }
-                else
-                {
-                    std::ofstream dest(m_outputDir + '\\' + textureName, std::ios::binary | std::ios::trunc);
-                    dest << src.rdbuf();
-                    dest.close();
-                }
-                src.close();
-            }
-            else
-            {
-                std::cout << "Failed to find texture: " << textureName << std::endl;
-            }
-        }
-        m_textureName = textureName;
-        //Changing the path to be compatible with the Jopnal engine
-        return m_modelName + '/' + textureName;
-    }
-
-    std::string Converter::findTexture(const std::string& searchDir, const std::string& texName)
-    {
-        DIR *dir;
-        struct dirent *ent;
-
-        //Anyone here?
-        if ((dir = opendir(searchDir.c_str())) != NULL)
-        {
-            //Are we there yet?
-            while ((ent = readdir(dir)) != NULL)
-            {
-                if (std::string(ent->d_name) != "." && std::string(ent->d_name) != "..")
-                {
-                    switch (ent->d_type)
-                    {
-                    case DT_UNKNOWN:
-                    case DT_REG:
-                    {
-                        //check file
-                        if (std::string(ent->d_name) == texName)
-                        {
-                            //texture found
-                            return searchDir + '\\' + ent->d_name;
-                        }
-                        break;
-                    }
-                    //go check the subfolder
-                    case DT_DIR:
-                    {
-                        std::string temp = findTexture(searchDir + '\\' + ent->d_name, texName);
-                        if (!temp.empty())
-                            return temp;
-                    }
-                    }
-                }
-            }
-        }
-        return "";
-    }
-
-    void Converter::getMaterials(const aiScene* scene, Model& model)
+    void Converter::getMaterials(const aiScene* scene, Model& model, FileSystem& fs)
     {
         aiColor3D col;
 
@@ -470,7 +348,7 @@ namespace jopm
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
 
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Diffuse);
                         joptexture.m_srgb = true;
                     }
@@ -483,7 +361,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Specular);
                     }
                 }
@@ -495,7 +373,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Gloss);
                     }
                 }
@@ -507,7 +385,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Emission);
                         joptexture.m_srgb = true;
                     }
@@ -520,7 +398,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Reflection);
                     }
                 }
@@ -532,7 +410,7 @@ namespace jopm
 
                     if (path.length && !textureExists(m_textures, path.C_Str()))
                     {
-                        joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                        joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                         joptexture.m_type = static_cast<int>(jop::Material::Map::Opacity);
                     }
                 }
@@ -576,16 +454,16 @@ namespace jopm
                             else
                                 continue;
 
-                            joptexture.m_texturePath = getTexture(jopmaterial, path.C_Str());
+                            joptexture.m_texturePaths = fs.getTexture(path.C_Str());
                             joptexture.m_type = static_cast<int>(map);
                         }
                     }
                 }
                 joptexture.m_texLength = m_binaryLastSize;
-                if (!joptexture.m_texturePath.empty() && std::strcmp(path.C_Str(), ""))
+                if (!joptexture.m_texturePaths.second.empty() && std::strcmp(path.C_Str(), ""))
                 {
                     m_textures[path.C_Str()] = joptexture;
-                    jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePath, joptexture.m_type);
+                    jopmaterial.m_keypairs.emplace_back(joptexture.m_texturePaths.second, joptexture.m_type);
                 }
             }
             model.m_materials.push_back(jopmaterial);
@@ -772,208 +650,11 @@ namespace jopm
         }
     }
 
-    std::string Converter::sortPaths(const int& argc, const char* argv[])
+    unsigned int Converter::processAssimpArgs(const FileSystem& fs)
     {
-        std::string searchLoc = argv[1];
-        std::string modelName = argv[1];
-        std::string fileOutPath;
-        std::string tempRoot;
-
-        int lastFolder = -1;
-        int lastDot = -1;
-        bool fromRoot = false;
-
-        //execution path
-        {
-            std::vector<wchar_t> pathBuffer;
-            DWORD copied = 0;
-            do {
-                pathBuffer.resize(pathBuffer.size() + MAX_PATH);
-                copied = GetModuleFileNameW(0, &pathBuffer.at(0), pathBuffer.size());
-            } while (copied >= pathBuffer.size());
-
-            pathBuffer.resize(copied);
-
-            tempRoot = std::string(pathBuffer.begin(), pathBuffer.end());
-
-            for (size_t i = 0; i < tempRoot.size(); ++i)
-            {
-                if (tempRoot[i] == '/' || tempRoot[i] == '\\' || tempRoot[i] == './' || tempRoot[i] == '.\\')
-                    lastFolder = i;
-            }
-            tempRoot.resize(lastFolder);
-        }
-        //~execution path
-
-        //argv[1]
-        {
-            //find out what kind of path we are given
-            lastFolder = -1; //reset
-
-            for (size_t i = 0; i < searchLoc.size(); ++i)
-            {
-                if (searchLoc[i] == '/' || searchLoc[i] == '\\' || searchLoc[i] == './' || searchLoc[i] == '.\\')
-                    lastFolder = i;
-                else if (searchLoc[i] == '.')
-                    lastDot = i;
-                else if (searchLoc[i] == ':')
-                    fromRoot = true;
-            }
-
-            //given argv[1] doesn't seem to be a file
-            if (lastDot == -1)
-            {
-                std::cout << "Unknown parameters: first argument is not a file\n" << std::endl; //fix so that * can be used for recursion
-                return ".jopm";
-            }
-
-            modelName = modelName.substr(lastFolder + 1, lastDot - (lastFolder + 1)); //name of the model == folder name to create
-
-            //Cut the model file out
-            searchLoc.resize(lastFolder);
-
-            //A directory structure was given but it doesn't start from root --- konv stuff/model.jopm
-            if (fromRoot == false)
-            {
-                searchLoc = tempRoot + '\\' + searchLoc;
-            }
-
-            //no directory structure was given, starting from working directory --- konv model.jopm
-            if (lastFolder == -1)
-            {
-                searchLoc = tempRoot;
-            }
-
-            m_searchLoc = searchLoc;
-        }
-        //~argv[1]
-
-        //argv[2]
-        {
-            if (argc > 2)
-            {
-                fileOutPath = argv[2];
-                lastDot = -1;
-                fromRoot = false;
-
-                auto& a = std::string(argv[2]);
-                auto& ac = m_argCalls;
-                bool skip = false;
-
-                for (unsigned int i = 0; i < ac.size(); ++i)
-                {
-                    if (!a.compare(ac[i] + "ET") || !a.compare(ac[i] + "et") || !a.compare(ac[i] + "embed-textures"))
-                        skip = true;
-
-                    else if (!a.compare(ac[i] + "CN") || !a.compare(ac[i] + "cn") || !a.compare(ac[i] + "no-collapse"))
-                        skip = true;
-
-                    else if (!a.compare(ac[i] + "CC") || !a.compare(ac[i] + "cc") || !a.compare(ac[i] + "no-center"))
-                        skip = true;
-                }
-                if (!skip)
-                {
-                    //find out what kind of path we are given
-                    for (size_t i = 0; i < fileOutPath.size(); ++i)
-                    {
-                        if (fileOutPath[i] == '.')
-                            lastDot = i;
-                        else if (fileOutPath[i] == ':')
-                            fromRoot = true;
-                    }
-
-                    //  C:/Program Files/.../model.txt || models/model.jpg
-                    if (lastDot != -1)
-                    {
-                        fileOutPath.resize(lastDot);
-                    }
-
-                    //  stuff/model1 || model1
-                    if (fromRoot == false)
-                    {
-                        fileOutPath = tempRoot + '\\' + fileOutPath;
-                    }
-                }
-            }
-            else
-            {
-                fileOutPath = searchLoc;
-            }
-        }
-        //~argv[2]
-
-        //Create directory tree
-        fileOutPath += '\\';
-        std::string tempPath = fileOutPath;
-        for (size_t i = 0; i < fileOutPath.size(); ++i)
-        {
-            if (fileOutPath[i] == '\\')
-            {
-                tempPath.resize(i);
-                _mkdir(tempPath.c_str());
-                tempPath = fileOutPath;
-            }
-        }
-        if (!m_embedTex)
-            _mkdir((fileOutPath + modelName).c_str());
-        m_outputDir = fileOutPath + modelName;
-        m_modelName = modelName;
-        return m_outputDir + ".jopm";
-    }
-
-    bool Converter::sortArgs(const int& argc, const char* argv[])
-    {
-        if (!std::strcmp(argv[1], "-h") || !std::strcmp(argv[1], "/h") || !std::strcmp(argv[1], "-help") || !std::strcmp(argv[1], "/help"))
-        {
-            std::cout <<
-                "\nJOPMODEL CONVERTER\n"
-                "Use this tool to convert your model files to be compatible with the Jopnal engine.\n"
-                "See more in \"Jopnal.net\" and \"github.com/Jopnal\"\n\n"
-                "ARGUMENTS:\n\n"
-                "REQUIRED:\n"
-                "First argument: file to load\n\n"
-                "OPTIONAL:\n"
-
-                "Second argument: path to write the new model file.\nWrites a file same name as the original model, ending in \".jopm\".\n"
-                "Creates required directories.\n"
-                "If not specified, creates the file in to the same directory as the original model.\n\n"
-
-                "-et : --embed-textures = embed textures into the model file, default off\n\n"
-                "-cn : --no-collapse    = collapse nodes, default on\n\n"
-                "-cc : --no-center      = calculate local center of the object for Jopnal engine, default on\n"
-                << std::endl;
-            return false;
-        }
-
-        std::vector<unsigned int> flags;
-
-
-        int i = 2;
-        if (std::string(argv[1]).find(':'))
-            i = 3;
-
-        for (; i < argc; ++i)
-        {
-            auto& a = std::string(argv[i]);
-            auto& ac = m_argCalls;
-
-            for (unsigned int j = 0; j < ac.size(); ++j)
-            {
-                if (!a.compare(ac[j] + "ET") || !a.compare(ac[j] + "et") || !a.compare(ac[j] + "embed-textures"))
-                    m_embedTex = true;
-
-                else if (!a.compare(ac[j] + "CN") || !a.compare(ac[j] + "cn") || !a.compare(ac[j] + "no-collapse"))
-                    flags.push_back(aiProcess_OptimizeGraph);
-
-                else if (!a.compare(ac[j] + "CC") || !a.compare(ac[j] + "cc") || !a.compare(ac[j] + "no-center"))
-                    m_centered = false;
-            }
-        }
-
         std::vector<unsigned int> impArgs = {
             aiProcess_CalcTangentSpace,
             aiProcess_JoinIdenticalVertices,
-            aiProcess_OptimizeGraph,
             aiProcess_OptimizeMeshes,
             aiProcess_RemoveComponent,
             aiProcess_RemoveRedundantMaterials,
@@ -982,23 +663,24 @@ namespace jopm
             aiProcess_ValidateDataStructure
         };
 
-        //Specified flags
-        for (unsigned int i = 0; i < flags.size(); ++i)
-        {
-            //find from impArgs
-            unsigned int pos = std::find(impArgs.begin(), impArgs.end(), flags[i]) - impArgs.begin();
-            if (pos < impArgs.size())
-            {
-                //remove from use
-                impArgs.erase(impArgs.begin() + pos);
-                flags.erase(flags.begin() + i);
-                --i;
-            }
-        }
-        for (auto& i : impArgs)
-            m_impArgs |= i;
+        if (fs.m_optimizeGraph)
+            impArgs.push_back(aiProcess_OptimizeGraph);
 
-        return true;
+        unsigned int t_impArgs = 0;
+        for (auto& i : impArgs)
+            t_impArgs |= i;
+
+        return t_impArgs;
+    }
+
+    void Converter::getValuesFS(const FileSystem& fs)
+    {
+        m_binaryLastSize = fs.m_binaryLastSize;
+        m_binaryWriter = fs.m_binaryWriter;
+        m_modelName = fs.m_modelName;
+        m_outPath = fs.m_absOutputPath;
+        m_centered = fs.m_centered;
+        m_embedTex = fs.m_embedTex;
     }
 
     int Converter::conversion(const int argc, const char* argv[])
@@ -1026,17 +708,20 @@ namespace jopm
             //~Terminal
 
             Converter conv;
+            FileSystem fs;
 
-            if (!conv.sortArgs(argc, argv))
+            if (!fs.sortArgs(argc, argv))
                 return false;
 
-            std::string pathIn = argv[1];
-            std::string fileOut = conv.sortPaths(argc, argv);
-            if (!std::strcmp(fileOut.c_str(), ".jopm"))
+            if (!std::strcmp(fs.sortPaths(argc, argv).c_str(), ".jopm"))
                 return false;
+
+            std::string absFile(fs.m_absOutputPath + ".jopm");
+            conv.getValuesFS(fs);
 
             //Setup Assimp
-            Assimp::DefaultLogger::set(new detail::Logger);
+            if (fs.m_verbose)
+                Assimp::DefaultLogger::set(new detail::Logger);
             Assimp::Importer imp;
             unsigned int comps = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_CAMERAS | aiComponent_LIGHTS;
             imp.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, comps);
@@ -1044,24 +729,30 @@ namespace jopm
 
             //read old model file with assimp
             std::cout << "Loading model..." << std::endl;
-            const aiScene *scene = imp.ReadFile(pathIn, conv.m_impArgs);
+            const aiScene *scene = imp.ReadFile(std::string(argv[1]), conv.processAssimpArgs(fs));
             if (!scene)
             {
-                SetConsoleTextAttribute(consoleHandle, 4);
+                SetConsoleTextAttribute(consoleHandle, 4u);
                 std::cout << "Unable to load mesh: " << imp.GetErrorString() << std::endl;
-                SetConsoleTextAttribute(consoleHandle, 7);
-                Assimp::DefaultLogger::kill();
+                SetConsoleTextAttribute(consoleHandle, 7u);
+                if (fs.m_verbose)
+                    Assimp::DefaultLogger::kill();
                 return false;
             }
 
-            SetConsoleTextAttribute(consoleHandle, 7);
-            Assimp::DefaultLogger::kill();
+            SetConsoleTextAttribute(consoleHandle, 7u);
+            if (fs.m_verbose)
+                Assimp::DefaultLogger::kill();
             Model model;
 
-            conv.getMaterials(scene, model);
+            conv.getMaterials(scene, model, fs);
             conv.getMeshes(scene, model);
+            conv.getValuesFS(fs);
 
-            if (conv.jsonWriter(*scene, model, fileOut) && conv.binaryWriter(model, fileOut))
+            if (fs.m_verbose)
+                std::cout << "json and binary will be written to: " << absFile << std::endl;
+
+            if (conv.jsonWriter(*scene, model, absFile) && conv.binaryWriter(model, absFile))
             {
                 std::cout << "Model converted successfully\n" << std::endl;
                 return true;
@@ -1070,7 +761,7 @@ namespace jopm
             return false;
         }
         else
-            std::cout << "Expected an argument, type \"konv -help\" to see instructions." << std::endl;
+            std::cout << "Expected an argument, type \"jopmodel -help\" to see instructions." << std::endl;
         return false;
     }
 }

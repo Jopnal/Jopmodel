@@ -38,7 +38,9 @@ namespace jopm
         ~Texture();
 
     private:
-		std::string m_texturePath;
+        //First: full old path to the texture.
+        //Second: 'modelname/texturename'
+        std::pair<std::string, std::string> m_texturePaths;
 		unsigned int m_type; //diffuse, specular etc.
 		unsigned int m_wrapmode; //repeat, clamp etc.
         unsigned int m_texStart;
